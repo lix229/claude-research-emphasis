@@ -1,0 +1,35 @@
+{
+  "name": "emphasis",
+  "version": "0.1.0",
+  "description": "Research-flavored status pills, brief cards, pill tables and agent-message styling for Claude Code replies",
+  "userConfig": {
+    "icons": {
+      "type": "string",
+      "title": "Icons",
+      "description": "unicode: plain symbols any font draws; nerd-font: Nerd Font icons and rounded pill ends; none: no icons",
+      "default": "unicode",
+      "options": [
+        "unicode",
+        "nerd-font",
+        "none"
+      ]
+    },
+    "boldColor": {
+      "type": "string",
+      "title": "Bold color",
+      "description": "Theme key or color name for bold text (empty keeps the normal text color)",
+      "default": "suggestion"
+    },
+    "palette": {
+      "type": "string",
+      "title": "Pill palette",
+      "description": "tinted: soft chips for a dark theme; bright: solid chips in the theme's own colors (use on a light theme)",
+      "default": "tinted",
+      "options": [
+        "tinted",
+        "bright"
+      ]
+    }
+  },
+  "license": "MIT"
+}

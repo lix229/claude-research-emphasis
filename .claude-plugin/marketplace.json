@@ -1,0 +1,13 @@
+{
+  "name": "claude-research-emphasis",
+  "description": "Research-flavored status pills and brief cards for Claude Code replies",
+  "owner": {
+    "name": "lix229"
+  },
+  "plugins": [
+    {
+      "name": "emphasis",
+      "source": "./"
+    }
+  ]
+}
