@@ -1,6 +1,6 @@
 import type { Register } from 'claude-code'
 
-import { groupLinks, parseBlocks, parseInline, pillRuns, readAgentMessage, senderColor, type IconSet, type Run, type Settings } from './emphasis'
+import { REMINDER, groupLinks, parseBlocks, parseInline, pillRuns, readAgentMessage, senderColor, type IconSet, type Run, type Settings } from './emphasis'
 
 /** The Claude Code theme's name, read once from the /config rows and kept current by config.set. */
 let themeName: string | undefined
@@ -30,6 +30,16 @@ export const register: Register = (on, options) => {
   const fixed = chosen === 'dark' || chosen === 'light' || chosen === 'theme' ? chosen : undefined
   const paletteFor = (theme: string): 'dark' | 'light' | 'theme' =>
     fixed ?? (/ansi|daltonized/.test(theme) ? 'theme' : theme.startsWith('light') ? 'light' : 'dark')
+  // A one-line reminder of the rules rides with each message the user types, so they stay in view in long
+  // sessions (the full rules come from CLAUDE.md once, at the start). Off with the reminder option.
+  if (options.reminder !== false) {
+    on('prompt.submit', async ($, e, next) => {
+      const kind = e.origin?.kind
+      if (kind !== 'composer' && kind !== 'bridge') return next(e)
+      return next({ ...e, context: [...(e.context ?? []), REMINDER] })
+    })
+  }
+
   on('config.set', { key: 'theme' }, async ($, e, next) => {
     const result = await next(e)
     if (typeof e.value === 'string') themeName = e.value

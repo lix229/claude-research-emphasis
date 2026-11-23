@@ -374,6 +374,7 @@ export function parseInline(src: string, set: Settings, base: Run = { s: '' }, l
         flush()
         out.push(...pillRuns(pill[1]!, set))
         i += pill[0].length
+        if (src[i] === ':' && (i + 1 >= src.length || src[i + 1] === ' ')) i += 1
         continue
       }
       const link = LINK.exec(rest)
@@ -562,18 +563,30 @@ export function parseBlocks(markdown: string, set: Settings): Block[] {
   return blocks
 }
 
-const FAMILY_RULES: [Family, string][] = [
-  ['mode', 'Kind of work. Opens the brief (see below); nowhere else'],
-  ['evidence', 'Where a claim comes from; drawn quietly, as an annotation. Mark every factual claim about data, results or code whose source is not obvious'],
-  ['verdict', 'When the user states or asks you to confirm a claim, open the answer with one of these'],
-  ['gate', 'Pre-registered pass/stop thresholds for an experiment and their outcomes. A miss starts an investigation of why, never a verdict on its own; Fold only after an independent review agrees'],
-  ['status', 'State of a piece of work'],
-  ['ask', 'Something only the user can do or decide. Start its own paragraph with it, after a blank line, at the end of the reply; the display draws that paragraph with an amber bar. Repeat each one there in a long reply'],
-  ['flag', 'Any fallback, compromise or change of plan the user was not told about beforehand. Follow it with **Logged:** and the path of the .md that records it'],
-  ['job', 'Slurm job states; may carry the job id or counts, e.g. [[Completed 16/16]], [[OOM 52084096]]'],
-  ['owner', 'Who owns data, derivatives, code or config you touched or propose to touch'],
-  ['hazard', 'Consequences, stated before the action is taken, with what is lost or spent'],
+/** When each family is required: the trigger the model checks for, in the order a reply is read. */
+const TRIGGERS: [Family, string][] = [
+  ['mode', 'The reply reports an investigation, an analysis, a run or a change, or proposes next steps: its first paragraph is the brief, which starts with one of these'],
+  ['evidence', 'You state a finding, a number or a result: end the sentence with where it comes from. When every item of a list has the same source, one tag on the list\'s lead line covers the list'],
+  ['status', 'A piece of work has an outcome (done, passed, partly done, failed, blocked): put the status beside it, with a count as detail, such as [[Partial 6/8]]'],
+  ['verdict', 'The user stated a claim or asked you to confirm one: open the answer with the verdict'],
+  ['ask', 'Something only the user can do or decide: give it its own paragraph at the end of the reply, starting with the ask'],
+  ['gate', 'A result is judged against a threshold fixed before the run. A miss starts an investigation of why, never a verdict on its own; Fold only after an independent review agrees'],
+  ['flag', 'You changed the plan, fell back or compromised without telling the user beforehand: flag it and follow with **Logged:** and the path of the .md that records it'],
+  ['job', 'You report the state of a scheduler job; put its id after the word, such as [[OOM 52084096]]'],
+  ['owner', 'You touched, or propose to touch, data, code or configuration that is not this task\'s own'],
+  ['hazard', 'Before an action that deletes, cannot be undone, or spends GPU allocation; say what is lost or spent'],
 ]
+
+/** A compact reply that follows the rules, shown to the model as the pattern to copy. */
+const EXAMPLE = `[[Ran]] I tested the review skill blind on one published paper. It found 6 of the 8 defects I planted and left the untouched paper's matching passages alone. One decision is needed below.
+
+**Broken copy** [[Partial 6/8]]
+- **Mechanism paragraph:** flagged as the top comment. [[Observed]]
+- **"little is known" gap:** missed; the new phrase scan now catches it. [[Fixed]]
+
+**Original paper:** it praised the six passages I had broken in the copy. [[Observed]] It holds drafts to his 2023 to 2025 habits rather than the 2021 paper's. [[Inferred]]
+
+[[Decision]] hold your drafts to his current habits, or to the era of each paper? I'd use current. **Next:** I'll record each habit's era in the profile.`
 
 /** The reply-style rules for the model, word lists read from the table that draws them. */
 export function replyGuidance(): string {
@@ -582,27 +595,103 @@ export function replyGuidance(): string {
       .filter(([, w]) => w.family === f)
       .map(([word, w]) => `[[${word}]] (${w.meaning})`)
       .join(', ')
-  const families = FAMILY_RULES.map(([f, rule]) => `  - **${f[0]!.toUpperCase() + f.slice(1)}.** ${rule}: ${byFamily(f)}.`).join('\n')
+  const triggers = TRIGGERS.map(([f, rule]) => `  - **${f[0]!.toUpperCase() + f.slice(1)}.** ${rule}: ${byFamily(f)}.`).join('\n')
   return `<reply_style>
-These rules shape replies in this terminal. A display plugin draws \`[[Word]]\` pills in a shape and color per family and colors bold text; the stored message keeps plain Markdown.
+These rules shape replies in this terminal. A display plugin draws each \`[[Word]]\` marker as a pill whose shape shows its family and whose color shows its state; the stored message keeps plain Markdown. Use exactly the words below; a known word may carry short detail ([[Completed 16/16]], [[Deviation D75]]). Any other word is drawn as a dim tag.
 
-- **Brief first.** A reply that reports an investigation, an analysis, a run, a change, or proposes what to do next opens with a brief: one paragraph of one to three sentences that starts with a mode pill and says what was checked, done or proposed, the outcome, and anything the user must do. The display draws it as a card. Write the brief as plain sentences: no other pills and no bold inside it. The details follow after a blank line. Skip the brief for short answers, conceptual explanations, and manuscript text.
-- **Pills mark status, evidence and decisions only.** A pill is \`[[Word]]\` beside the thing it describes. Use exactly these words; a known word may carry short detail ([[Completed 16/16]], [[Deviation D75]]). Any other word is drawn as a dim tag.
-${families}
-- **Same place every time.** Put a verdict right after the bold lead label it answers; put an evidence tag at the end of the claim it qualifies; start a paragraph with an ask. At most two pills on a line, except a row of job states; when a reply would need more than about eight pills, put the items in a table with one column of pills.
-- **Every attention pill carries its action.** After [[Unverified]], [[Gate missed]], [[Failed]], [[Blocked]], [[Needs you]], [[Decision]], [[Deviation]], a hazard or a failed job, give the one fact needed to act, introduced by a bold lead-in ending in a colon: ${ACTION_WORDS.map(w => `**${w}:**`).join(', ')}.
-- **Statistics stay in words and numbers.** Report effects with their CI or adjusted p in plain text; do not make significance into a pill. [[Underpowered]] is the exception.
-- **Bold lead labels, sparingly elsewhere.** Start a bullet that is about one subject with a bold lead label ending in a colon (**Cause:**); the display colors it. Inside sentences, bold at most one or two anchor terms per paragraph (the dataset, model, cohort or option the sentence turns on). Preferred lead labels: ${LEAD_LABELS.join(', ')}.
-- **Keep text that will be copied clean.** No pills, bold color labels or tree shapes in manuscript paragraphs (give those as blockquotes, drawn at full brightness), paths, commands, code, literal output, or anything written to a file.
-- **Shape follows information.** \`├──\` and \`└──\` for what belongs to what, \`→\` for a sequence, \`✓\` or \`✗\` beside a checked item.
+- **Markers are required where their trigger applies.** Skipping one hides information the user scans for. The triggers:
+${triggers}
+- **Brief.** One to three plain sentences after the mode marker: what was checked, done or proposed, the outcome, and anything the user must do. No other markers and no bold inside it; the display draws it as a card with the mode in its border. Skip the brief for short answers, conceptual explanations, and manuscript text.
+- **Same place every time.** A verdict right after the bold lead label it answers; an evidence tag at the end of its sentence; a status beside the item or on the lead line of its list; an ask at the start of the last paragraph. At most two markers on a line, except a row of job states; when a reply would need more than about ten, put the items in a table with a column of markers.
+- **Every attention marker carries its action.** After [[Unverified]], [[Gate missed]], [[Failed]], [[Blocked]], [[Partial]], [[Needs you]], [[Decision]], [[Deviation]], a hazard or a failed job, give the one fact needed to act, introduced by a bold lead-in ending in a colon: ${ACTION_WORDS.map(w => `**${w}:**`).join(', ')}.
+- **Check before sending** a reply that reports work: it opens with the brief; each finding ends with an evidence tag (or its list's lead line has one); each outcome has a status; each ask is the last paragraph.
+- **Statistics stay in words and numbers.** Report effects with their CI or adjusted p in plain text; do not make significance into a marker. [[Underpowered]] is the exception.
+- **Bold lead labels, sparingly elsewhere.** Start a bullet that is about one subject with a bold lead label ending in a colon (**Cause:**). Inside sentences, bold at most one or two anchor terms per paragraph. Preferred lead labels: ${LEAD_LABELS.join(', ')}.
+- **Keep text that will be copied clean.** No markers, bold labels or tree shapes in manuscript paragraphs (give those as blockquotes), paths, commands, code, literal output, or anything written to a file.
+- **Shape follows information.** \`├──\` and \`└──\` for what belongs to what, \`→\` for a sequence, \`✓\` or \`✗\` beside a checked item in a table.
+
+A reply that follows these rules:
+
+\`\`\`markdown
+${EXAMPLE}
+\`\`\`
 </reply_style>`
 }
+
+/** The one-line reminder attached to each message the user types, so the rules stay in view in long sessions. */
+export const REMINDER =
+  'Reply style (emphasis plugin): a reply that reports work opens with a brief starting [[Investigate]], [[Ran]], [[Changed]] or [[Propose]]; ' +
+  'each finding ends with [[Observed]], [[Inferred]], [[Unverified]] or [[Cited]]; each outcome gets a status such as [[Done]], [[Partial 6/8]] or [[Failed]]; ' +
+  'an ask is the last paragraph, starting [[Needs you]] or [[Decision]]. Full rules: the Reply style section of CLAUDE.md.'
 
 
 const width = (runs: Run[]) => runs.reduce((n, r) => n + [...r.s].length, 0)
 const splitRow = (line: string) =>
   line.trim().replace(/^\|/, '').replace(/(?<!\\)\|$/, '').split(/(?<!\\)\|/).map(c => c.trim())
 const SEPARATOR = /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?\s*$/
+
+/** Styled runs broken into lines of at most `max` cells, at regular spaces; a pill never splits. */
+export function wrapRuns(runs: Run[], max: number): Run[][] {
+  type Piece = { run: Run; text: string }
+  type Token = { pieces: Piece[]; w: number; space: boolean }
+  const tokens: Token[] = []
+  let word: Token | undefined
+  for (const run of runs) {
+    for (const part of run.s.split(/( +)/)) {
+      if (!part) continue
+      if (/^ +$/.test(part)) {
+        word = undefined
+        tokens.push({ pieces: [{ run, text: part }], w: part.length, space: true })
+        continue
+      }
+      if (!word) tokens.push((word = { pieces: [], w: 0, space: false }))
+      word.pieces.push({ run, text: part })
+      word.w += [...part].length
+    }
+  }
+  const lines: Run[][] = [[]]
+  let used = 0
+  const trim = () => {
+    const line = lines[lines.length - 1]!
+    while (line.length && /^ +$/.test(line[line.length - 1]!.s)) used -= line.pop()!.s.length
+  }
+  const newline = () => {
+    trim()
+    lines.push([])
+    used = 0
+  }
+  for (const t of tokens) {
+    if (t.space) {
+      if (used > 0 && used + t.w < max) {
+        for (const p of t.pieces) lines[lines.length - 1]!.push({ ...p.run, s: p.text })
+        used += t.w
+      }
+      continue
+    }
+    if (used > 0 && used + t.w > max) newline()
+    for (const p of t.pieces) {
+      // A single word wider than the column is cut across lines.
+      let rest = [...p.text]
+      while (rest.length) {
+        if (used >= max) newline()
+        const take = rest.slice(0, max - used)
+        lines[lines.length - 1]!.push({ ...p.run, s: take.join('') })
+        used += take.length
+        rest = rest.slice(take.length)
+      }
+    }
+  }
+  trim()
+  return lines
+}
+
+/** A pill as plain text, for the rare table that has to stay with Claude Code's renderer. */
+function plainPill(text: string, set: Settings): string {
+  const { word, detail, text: whole } = readLabel(text)
+  if (!word) return whole
+  const glyph = set.icons === 'none' ? '' : WORDS[word]!.glyph
+  return `${glyph ? glyph + ' ' : ''}${word}${detail}`
+}
 
 /** A GFM table drawn with the same box lines Claude Code uses, so pills inside it are colored. */
 function tableLines(rows: string[][], aligns: string[], set: Settings): Run[][] | undefined {
@@ -611,20 +700,35 @@ function tableLines(rows: string[][], aligns: string[], set: Settings): Run[][] 
     Array.from({ length: cols }, (_, c) => parseInline(r[c] ?? '', set, i === 0 ? { s: '', bold: true } : { s: '' })),
   )
   const widths = Array.from({ length: cols }, (_, c) => Math.max(1, ...cells.map(r => width(r[c]!))))
-  const total = widths.reduce((a, b) => a + b + 3, 1)
-  if (set.maxWidth && total > set.maxWidth) return undefined
-  const rule = (l: string, m: string, r: string): Run[] => [{ s: l + widths.map(w => '─'.repeat(w + 2)).join(m) + r, dim: true }]
-  const row = (r: Run[][]): Run[] => {
-    const out: Run[] = [{ s: '│', dim: true }]
-    r.forEach((cell, c) => {
-      const gap = widths[c]! - width(cell)
-      const a = aligns[c] ?? 'left'
-      const left = a === 'right' ? gap : a === 'center' ? Math.floor(gap / 2) : 0
-      out.push({ s: ' ' + ' '.repeat(left) }, ...cell, { s: ' '.repeat(gap - left) + ' ' }, { s: '│', dim: true })
-    })
-    return out
+  const total = () => widths.reduce((a, b) => a + b + 3, 1)
+  // Too wide for the window: narrow the widest column a cell at a time and wrap its text.
+  if (set.maxWidth) {
+    while (total() > set.maxWidth) {
+      const i = widths.indexOf(Math.max(...widths))
+      if (widths[i]! <= 10) return undefined
+      widths[i]! -= 1
+    }
   }
-  return [rule('┌', '┬', '┐'), row(cells[0]!), rule('├', '┼', '┤'), ...cells.slice(1).map(row), rule('└', '┴', '┘')]
+  const wrapped = cells.map(r => r.map((cell, c) => wrapRuns(cell, widths[c]!)))
+  const isTall = wrapped.slice(1).some(r => r.some(lines => lines.length > 1))
+  const rule = (l: string, m: string, r: string): Run[] => [{ s: l + widths.map(w => '─'.repeat(w + 2)).join(m) + r, dim: true }]
+  const row = (r: Run[][][]): Run[][] => {
+    const height = Math.max(...r.map(lines => lines.length))
+    return Array.from({ length: height }, (_, k) => {
+      const out: Run[] = [{ s: '│', dim: true }]
+      r.forEach((lines, c) => {
+        const cell = lines[k] ?? []
+        const gap = widths[c]! - width(cell)
+        const a = aligns[c] ?? 'left'
+        const left = a === 'right' ? gap : a === 'center' ? Math.floor(gap / 2) : 0
+        out.push({ s: ' ' + ' '.repeat(left) }, ...cell, { s: ' '.repeat(gap - left) + ' ' }, { s: '│', dim: true })
+      })
+      return out
+    })
+  }
+  // Rows that wrap get a rule between them, as Claude Code draws them, so each row reads as one.
+  const body = wrapped.slice(1).flatMap((r, i) => [...(isTall && i > 0 ? [rule('├', '┼', '┤')] : []), ...row(r)])
+  return [rule('┌', '┬', '┐'), ...row(wrapped[0]!), rule('├', '┼', '┤'), ...body, rule('└', '┴', '┘')]
 }
 
 /** Pull the tables that hold pills out of a Markdown block; the rest stays Markdown. */
@@ -668,6 +772,10 @@ function splitTables(text: string, set: Settings): Block[] {
           i = j - 1
           continue
         }
+        // Too wide even narrowed: Claude Code draws it, with each pill as plain text instead of raw brackets.
+        md.push(...group.map(l => l.replace(/\[\[([^[\]\n]{1,32})\]\]/g, (_, t: string) => plainPill(t, set))))
+        i = j - 1
+        continue
       }
     }
     md.push(line)

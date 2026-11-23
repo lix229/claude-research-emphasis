@@ -23,6 +23,8 @@ Then start a new Claude Code session. To bring a running session over, `/exit`, 
 1. It registers this folder as a plugin marketplace and installs the `emphasis` plugin at user scope (`claude plugin marketplace add <folder>`, then `claude plugin install emphasis@claude-research-emphasis`).
 2. It adds an import of `reply-style.md` to `~/.claude/CLAUDE.md`, so Claude knows which words to write and when to open with a brief card. A plugin cannot add these rules itself: Claude Code does not let plugins change the system prompt.
 
+The plugin also attaches a one-line reminder of the rules (about 60 words) to each message you type, so Claude keeps using the markers in long sessions. Turn it off with the `reminder` option.
+
 To install by hand instead, run the two `claude plugin` commands from step 1, then add this to `~/.claude/CLAUDE.md`, with the path to your clone:
 
 ```markdown
@@ -73,6 +75,7 @@ Set these in Claude Code's config menu (`/config`, under the plugin's name), or 
 |---|---|---|
 | `icons` | `unicode` (marks any font draws), `nerd-font` (Nerd Font icons; rounded, arrow and slanted chip ends), `none` | `unicode` |
 | `palette` | `auto` (follow the Claude Code theme), `dark`, `light`, `theme` (Claude Code's theme colors, solid chips) | `auto` |
+| `reminder` | attach the one-line rules reminder to each message you type | on |
 | `boldColor` | color of bold lead labels: a theme key such as `suggestion`, a color name or hex; empty keeps the text color | empty |
 
 ## Changing the words
@@ -97,7 +100,7 @@ Then delete the "Reply style (emphasis)" section from `~/.claude/CLAUDE.md`.
 
 ## Limits
 
-- Claude follows the rules in `reply-style.md`. Smaller models (Haiku) sometimes skip the markers.
+- Claude follows the rules in `reply-style.md`; the plugin only draws what Claude writes. Smaller models (Haiku) sometimes skip the markers. A session keeps the rules it started with: after updating, start a new session (or `/exit`, then `claude --continue`).
 - Claude Code only. Codex CLI plugins can add skills, MCP servers and hooks, but cannot change how a reply is drawn, so the markers would show as plain `[[Done]]` text there.
 
 ## Credits

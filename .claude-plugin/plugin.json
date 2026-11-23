@@ -31,6 +31,12 @@
         "light",
         "theme"
       ]
+    },
+    "reminder": {
+      "type": "boolean",
+      "title": "Per-message reminder",
+      "description": "Attach a one-line reminder of the reply-style rules to each message you type (about 60 words), so Claude keeps using the markers in long sessions",
+      "default": true
     }
   },
   "license": "MIT"
