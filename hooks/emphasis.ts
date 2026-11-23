@@ -26,102 +26,94 @@ export type Block =
   | { k: 'blank' }
   | { k: 'lines'; lines: Run[][] }
 
-export type Palette = 'tinted' | 'bright'
-export type Settings = { icons: IconSet; boldColor: string; palette?: Palette; maxWidth?: number }
+/** `auto` follows the Claude Code theme; the others force one set of colors. */
+export type Palette = 'auto' | 'dark' | 'light' | 'theme'
+export type Settings = { icons: IconSet; boldColor: string; palette?: 'dark' | 'light' | 'theme'; maxWidth?: number }
 
 /**
- * Pill families. Each family has its own shape, so a glance tells evidence from a gate from a job:
- *   evidence  ◉ Observed          glyph + colored word, no background
- *   verdict   █ ✓ CONFIRMED █     solid stamp, dark text, upper case
- *   gate      ◖▲ Gate met◗        tinted chip with round ends
- *   status    ▐✓ Done▌            tinted chip with square half-block ends
- *   ask       ▶ Needs you         bold amber, underlined
- *   flag      ▌ Deviation         strong left bar, tinted body, open right end
- *   job       [● Running]         dim brackets around a colored state
- *   owner     @foreign            lower-case handle, underlined
- *   hazard    ▚ DESTRUCTIVE ▚     solid red with hazard ends
- *   context   ‹ New ›             dim, in guillemets (any other word)
- *   mode      ◆ INVESTIGATE        opens a reply's brief card; inline, a solid tag
+ * Pill families. Each family has its own shape, so a glance tells evidence from a gate from a job.
+ * Unicode mode (any font) / nerd-font mode:
+ *   evidence  ◉ Observed           colored word with a mark, no background
+ *   verdict   ✓ CONFIRMED          solid stamp, capitals (nerd: rounded)
+ *   gate      ▲│Gate met           two-tone badge: solid icon cell, soft label (nerd: arrow ends)
+ *   status    ▐✓ Done▌             soft chip (nerd: rounded)
+ *   ask       ▶ Needs you          amber, underlined word
+ *   flag      ▌ Deviation D12      strong left bar, soft body
+ *   job       [● Running]          dim brackets around a colored state
+ *   owner     @foreign             colored handle
+ *   hazard    ╱╱ DESTRUCTIVE ╱╱    solid with hazard stripes (nerd: slanted ends)
+ *   mode      ◎ INVESTIGATE        soft tag that opens the brief card
+ *   context   ‹ New ›              dim, any other word
  */
 export type Family = 'mode' | 'evidence' | 'verdict' | 'gate' | 'status' | 'ask' | 'flag' | 'job' | 'owner' | 'hazard' | 'context'
 export type Hue = 'green' | 'red' | 'amber' | 'blue' | 'violet' | 'magenta' | 'cyan' | 'grey'
 
-/** Per hue: the bright text color, a dark wash for chip backgrounds, a saturated fill for stamps. */
-export const HUES: Record<Hue, { fg: string; wash: string; solid: string }> = {
-  green: { fg: '#86e1a6', wash: '#1d3b2a', solid: '#3fb96a' },
-  red: { fg: '#ff9aa6', wash: '#4a1d26', solid: '#e5484d' },
-  amber: { fg: '#f6cf6a', wash: '#463610', solid: '#f0b429' },
-  blue: { fg: '#9dbcff', wash: '#1c2d57', solid: '#4c7dff' },
-  violet: { fg: '#c9a7ff', wash: '#33264f', solid: '#8b5cf6' },
-  magenta: { fg: '#f3a1d6', wash: '#4a1f3d', solid: '#d6409f' },
-  cyan: { fg: '#79deef', wash: '#123c46', solid: '#22b8cf' },
-  grey: { fg: '#b9c2da', wash: '#2b3040', solid: '#6b7280' },
+/** One hue in one palette: text on the terminal background, a soft chip, a solid chip. */
+type Swatch = { text: string; wash: string; onWash: string; solid: string; onSolid: string }
+
+const INK = '#141414'
+/** Tuned for dark terminal backgrounds. */
+const DARK: Record<Hue, Swatch> = {
+  green: { text: '#86e1a6', wash: '#1d3b2a', onWash: '#86e1a6', solid: '#3fb96a', onSolid: INK },
+  red: { text: '#ff9aa6', wash: '#4a1d26', onWash: '#ff9aa6', solid: '#ec5b67', onSolid: INK },
+  amber: { text: '#f6cf6a', wash: '#463610', onWash: '#f6cf6a', solid: '#f0b429', onSolid: INK },
+  blue: { text: '#9dbcff', wash: '#1c2d57', onWash: '#9dbcff', solid: '#7aa2ff', onSolid: INK },
+  violet: { text: '#c9a7ff', wash: '#33264f', onWash: '#c9a7ff', solid: '#b08cff', onSolid: INK },
+  magenta: { text: '#f3a1d6', wash: '#4a1f3d', onWash: '#f3a1d6', solid: '#e66bbd', onSolid: INK },
+  cyan: { text: '#79deef', wash: '#123c46', onWash: '#79deef', solid: '#45c8de', onSolid: INK },
+  grey: { text: '#b9c2da', wash: '#2b3040', onWash: '#b9c2da', solid: '#97a0b5', onSolid: INK },
 }
-/** The same hues as theme keys, for the `bright` palette on a light theme. */
-const THEME_HUES: Record<Hue, { fg: string; wash: string; solid: string }> = {
-  green: { fg: 'success', wash: 'success', solid: 'success' },
-  red: { fg: 'error', wash: 'error', solid: 'error' },
-  amber: { fg: 'warning', wash: 'warning', solid: 'warning' },
-  blue: { fg: 'suggestion', wash: 'suggestion', solid: 'suggestion' },
-  violet: { fg: 'merged', wash: 'merged', solid: 'merged' },
-  magenta: { fg: 'magenta', wash: 'magenta', solid: 'magenta' },
-  cyan: { fg: 'cyan', wash: 'cyan', solid: 'cyan' },
-  grey: { fg: 'inactive', wash: 'inactive', solid: 'inactive' },
+/** Tuned for light terminal backgrounds: deep text, pale chips. */
+const LIGHT: Record<Hue, Swatch> = {
+  green: { text: '#1a7f37', wash: '#dafbe1', onWash: '#116329', solid: '#1f883d', onSolid: '#ffffff' },
+  red: { text: '#cf222e', wash: '#ffebe9', onWash: '#a40e26', solid: '#cf222e', onSolid: '#ffffff' },
+  amber: { text: '#9a6700', wash: '#fff8c5', onWash: '#7d4e00', solid: '#e3b341', onSolid: '#1f2328' },
+  blue: { text: '#0969da', wash: '#ddf4ff', onWash: '#0550ae', solid: '#0969da', onSolid: '#ffffff' },
+  violet: { text: '#8250df', wash: '#fbefff', onWash: '#6639ba', solid: '#8250df', onSolid: '#ffffff' },
+  magenta: { text: '#bf3989', wash: '#ffeff7', onWash: '#99286e', solid: '#bf3989', onSolid: '#ffffff' },
+  cyan: { text: '#1b7c83', wash: '#d9f6f7', onWash: '#136061', solid: '#1b7c83', onSolid: '#ffffff' },
+  grey: { text: '#59636e', wash: '#eff2f5', onWash: '#424a53', solid: '#6e7781', onSolid: '#ffffff' },
 }
+/**
+ * Claude Code's own color names: they follow every theme, including the colorblind (daltonized)
+ * and terminal-palette (ANSI) ones. Chips are solid with the theme's inverse text.
+ */
+const key = (k: string): Swatch => ({ text: k, wash: k, onWash: 'inverseText', solid: k, onSolid: 'inverseText' })
+const THEMED: Record<Hue, Swatch> = {
+  green: key('success'),
+  red: key('error'),
+  amber: key('warning'),
+  blue: key('ide'),
+  violet: key('merged'),
+  magenta: key('bashBorder'),
+  cyan: key('planMode'),
+  grey: key('inactive'),
+}
+const swatches = (set: Settings) => (set.palette === 'light' ? LIGHT : set.palette === 'theme' ? THEMED : DARK)
+
+/** Background behind inline code, per palette. */
+export const codeBg = (set: Settings) => (set.palette === 'light' ? '#eff2f5' : set.palette === 'theme' ? undefined : '#30343f')
 
 type Word = { family: Family; hue: Hue; glyph: string; meaning: string }
 
 /** Nerd Font (Font Awesome) icon per word, used when `icons` is `nerd-font`. */
 export const NERD_ICONS: Record<string, string> = {
-  'Investigate': '\uf002',
-  'Propose': '\uf277',
-  'Changed': '\uf040',
-  'Ran': '\uf04b',
-  'Observed': '\uf06e',
-  'Inferred': '\uf0eb',
-  'Unverified': '\uf059',
-  'Cited': '\uf02d',
-  'Confirmed': '\uf058',
-  'Corrected': '\uf044',
-  'Contradicted': '\uf057',
-  'Gate met': '\uf11e',
-  'Gate missed': '\uf11d',
-  'Fold': '\uf28d',
-  'Shelve': '\uf28b',
-  'Exploratory': '\uf14e',
-  'Underpowered': '\uf243',
-  'Done': '\uf00c',
-  'Passed': '\uf00c',
-  'Handed over': '\uf0ec',
-  'Fixed': '\uf0ad',
-  'Recommended': '\uf005',
-  'Failed': '\uf00d',
-  'Blocked': '\uf05e',
-  'Partial': '\uf042',
-  'Skipped': '\uf04e',
-  'At risk': '\uf071',
-  'Needs you': '\uf007',
-  'Decision': '\uf126',
-  'Deviation': '\uf024',
-  'Submitted': '\uf093',
-  'Queued': '\uf017',
-  'Running': '\uf110',
-  'Cancelled': '\uf05e',
-  'Completed': '\uf058',
-  'OOM': '\uf2db',
-  'Killed 143': '\uf253',
-  'Owned': '\uf007',
-  'Shared': '\uf0c0',
-  'Foreign': '\uf023',
-  'Destructive': '\uf1f8',
-  'Irreversible': '\uf023',
-  'GPU quota': '\uf2db',
+  Investigate: '', Propose: '', Changed: '', Ran: '',
+  Observed: '', Inferred: '', Unverified: '', Cited: '',
+  Confirmed: '', Corrected: '', Contradicted: '',
+  'Gate met': '', 'Gate missed': '', Fold: '', Shelve: '', Exploratory: '', Underpowered: '',
+  Done: '', Passed: '', 'Handed over': '', Fixed: '', Recommended: '', Failed: '',
+  Blocked: '', Partial: '', Skipped: '', 'At risk': '',
+  'Needs you': '', Decision: '', Deviation: '',
+  Submitted: '', Queued: '', Running: '', Cancelled: '', Completed: '', OOM: '', 'Killed 143': '',
+  Owned: '', Shared: '', Foreign: '',
+  Destructive: '', Irreversible: '', 'GPU quota': '',
 }
 
 /** The words the model is told to write, in the order the rules list them. */
 export const WORDS: Record<string, Word> = {
   // Kind of work: opens the brief card at the top of a reply.
-  Investigate: { family: 'mode', hue: 'cyan', glyph: '⌕', meaning: 'I looked into something and report what I found' },
+  Investigate: { family: 'mode', hue: 'cyan', glyph: '◎', meaning: 'I looked into something and report what I found' },
   Propose: { family: 'mode', hue: 'violet', glyph: '➜', meaning: 'I suggest what to do next' },
   Changed: { family: 'mode', hue: 'green', glyph: '✎', meaning: 'I edited files, data or jobs' },
   Ran: { family: 'mode', hue: 'blue', glyph: '▶', meaning: 'I ran an analysis, test or job' },
@@ -157,12 +149,12 @@ export const WORDS: Record<string, Word> = {
   Decision: { family: 'ask', hue: 'amber', glyph: '▶', meaning: 'a call only the user makes' },
   // Disclosure.
   Deviation: { family: 'flag', hue: 'magenta', glyph: '', meaning: 'an undisclosed fallback or compromise' },
-  // Slurm jobs.
-  Queued: { family: 'job', hue: 'grey', glyph: '◷', meaning: 'waiting in Slurm' },
-  Submitted: { family: 'job', hue: 'grey', glyph: '↑', meaning: 'sent to Slurm' },
+  // Scheduler jobs.
+  Submitted: { family: 'job', hue: 'grey', glyph: '↑', meaning: 'sent to the scheduler' },
+  Queued: { family: 'job', hue: 'grey', glyph: '…', meaning: 'waiting in the queue' },
   Running: { family: 'job', hue: 'cyan', glyph: '●', meaning: 'running' },
-  Cancelled: { family: 'job', hue: 'grey', glyph: '⊘', meaning: 'cancelled' },
   Completed: { family: 'job', hue: 'green', glyph: '✓', meaning: 'exit 0' },
+  Cancelled: { family: 'job', hue: 'grey', glyph: '⊘', meaning: 'cancelled' },
   OOM: { family: 'job', hue: 'red', glyph: '✗', meaning: 'out of memory' },
   'Killed 143': { family: 'job', hue: 'red', glyph: '✗', meaning: 'SIGTERM, usually the time limit' },
   // Ownership of data and code.
@@ -170,9 +162,9 @@ export const WORDS: Record<string, Word> = {
   Shared: { family: 'owner', hue: 'blue', glyph: '@', meaning: 'lab-shared storage others use' },
   Foreign: { family: 'owner', hue: 'amber', glyph: '@', meaning: 'someone else\'s, such as another person\'s derivatives' },
   // Consequences.
-  Destructive: { family: 'hazard', hue: 'red', glyph: '▚', meaning: 'deletes or overwrites' },
-  Irreversible: { family: 'hazard', hue: 'red', glyph: '▚', meaning: 'cannot be undone' },
-  'GPU quota': { family: 'hazard', hue: 'amber', glyph: '▚', meaning: 'spends GPU allocation' },
+  Destructive: { family: 'hazard', hue: 'red', glyph: '', meaning: 'deletes or overwrites' },
+  Irreversible: { family: 'hazard', hue: 'red', glyph: '', meaning: 'cannot be undone' },
+  'GPU quota': { family: 'hazard', hue: 'amber', glyph: '', meaning: 'spends GPU allocation' },
 }
 
 /** Other spellings that display as a listed word. */
@@ -201,117 +193,94 @@ export function readLabel(label: string): { word: string | undefined; detail: st
   return { word: KEYS.get(known), detail: text.slice(known.length), text }
 }
 
-/** The hue of a mode word, for the brief card's border; undefined for any other label. */
+/** The color of a mode word, for the brief card's border; undefined for any other label. */
 export function modeHue(label: string, set: Settings): string | undefined {
   const { word } = readLabel(label)
   const w = word ? WORDS[word] : undefined
-  return w?.family === 'mode' ? (set.palette === 'bright' ? THEME_HUES : HUES)[w.hue].fg : undefined
+  return w?.family === 'mode' ? swatches(set)[w.hue].text : undefined
 }
 
-// Powerline caps from the Nerd Font set: round, arrow and slant ends.
-const ROUND = ['\ue0b6', '\ue0b4']
-const ARROW = ['\ue0b2', '\ue0b0']
-const SLANT = ['\ue0ba', '\ue0bc']
+// Powerline caps from the Nerd Font set: round, arrow and slanted ends.
+const ROUND = ['', '']
+const ARROW_IN = ''
+const ARROW_OUT = ''
+const SLANT = ['', '']
 
-/** A chip: caps in the fill color on either side of the filled label. */
-function chip(text: string, fill: string, fg: string, caps: string[], extra: Partial<Run> = {}): Run[] {
-  return [
-    { s: caps[0]!, color: fill },
-    { s: text, bg: fill, color: fg, bold: true, ...extra },
-    { s: caps[1]!, color: fill },
-  ]
+const nb = (s: string) => s.replace(/ /g, ' ')
+
+/** The visible label: the word in bold, then any detail ("16/16", "D12") in regular weight. */
+function label(icon: string, word: string, detail: string, style: Partial<Run>, upper = false): Run[] {
+  const head = nb(`${icon ? icon + ' ' : ''}${upper ? word.toUpperCase() : word}`)
+  return [{ ...style, s: head, bold: true }, ...(detail ? [{ ...style, s: nb(detail), bold: false }] : [])]
 }
 
-/** The nerd-font drawing: the same families, with real icons and rounded, arrow or slanted ends. */
-function nerdRuns(word: string, w: Word, h: { fg: string; wash: string; solid: string }, shown: string, nb: (s: string) => string): Run[] {
-  const i = NERD_ICONS[word] ?? w.glyph
-  switch (w.family) {
-    case 'evidence':
-      return [{ s: nb(`${i} ${shown}`), color: h.fg, bold: true }]
-    case 'verdict':
-      return chip(nb(`${i} ${shown.toUpperCase()}`), h.solid, '#101010', ROUND)
-    case 'gate':
-      return chip(nb(`${i} ${shown}`), h.wash, h.fg, ARROW)
-    case 'status':
-      return chip(nb(`${i} ${shown}`), h.wash, h.fg, ROUND)
-    case 'ask':
-      return [{ s: nb(`${i} ${shown}`), color: h.solid, bold: true, underline: true }]
-    case 'flag':
-      return [{ s: '▌', color: h.solid }, { s: nb(` ${i} ${shown}`), bg: h.wash, color: h.fg, bold: true }, { s: ROUND[1]!, color: h.wash }]
-    case 'job':
-      return [{ s: '[', dim: true }, { s: nb(`${i} ${shown}`), color: h.fg, bold: true }, { s: ']', dim: true }]
-    case 'owner':
-      return [{ s: nb(`${i} @${shown.toLowerCase()}`), color: h.fg, underline: true }]
-    case 'hazard':
-      return chip(nb(`${i} ${shown.toUpperCase()}`), h.solid, '#ffffff', SLANT)
-    case 'mode':
-      return chip(nb(`${i} ${shown.toUpperCase()}`), h.wash, h.fg, ROUND)
-    case 'context':
-      return [{ s: nb(`‹ ${shown} ›`), dim: true }]
-  }
-}
-
-export function pillRuns(label: string, set: Settings): Run[] {
-  const { word, detail, text } = readLabel(label)
-  const nb = (s: string) => s.replace(/ /g, ' ')
-  if (!word) return [{ s: nb(`‹ ${text} ›`), dim: true }]
+export function pillRuns(text: string, set: Settings): Run[] {
+  const { word, detail, text: whole } = readLabel(text)
+  if (!word) return [{ s: nb(`‹ ${whole} ›`), dim: true }]
   const w = WORDS[word]!
-  const h = (set.palette === 'bright' ? THEME_HUES : HUES)[w.hue]
-  const g = set.icons === 'none' ? '' : w.glyph
-  const shown = nb(word + detail)
-  if (set.icons === 'nerd-font') return nerdRuns(word, w, h, shown, nb)
+  const h = swatches(set)[w.hue]
+  const nerd = set.icons === 'nerd-font'
+  const icon = set.icons === 'none' ? '' : nerd ? (NERD_ICONS[word] ?? w.glyph) : w.glyph
+  const pad = (runs: Run[], style: Partial<Run>): Run[] => [{ ...style, s: ' ' }, ...runs, { ...style, s: ' ' }]
   switch (w.family) {
     case 'evidence':
-      return [{ s: nb(`${g ? g + ' ' : ''}${shown}`), color: h.fg, bold: true }]
-    case 'verdict':
-      return [{ s: nb(` ${g ? g + ' ' : ''}${shown.toUpperCase()} `), bg: h.solid, color: '#101010', bold: true }]
-    case 'gate':
-      return [
-        { s: '◖', color: h.wash },
-        { s: nb(`${g ? g + ' ' : ''}${shown}`), bg: h.wash, color: h.fg, bold: true },
-        { s: '◗', color: h.wash },
-      ]
+      return label(icon, word, detail, { color: h.text })
+    case 'verdict': {
+      const fill = { bg: h.solid, color: h.onSolid }
+      if (nerd) return [{ s: ROUND[0]!, color: h.solid }, ...label(icon, word, detail, fill, true), { s: ROUND[1]!, color: h.solid }]
+      return pad(label(icon, word, detail, fill, true), fill)
+    }
+    case 'gate': {
+      const head = { bg: h.solid, color: h.onSolid }
+      // With theme colors the soft and solid fills are the same color, so the label goes unfilled.
+      const body = set.palette === 'theme' ? { color: h.text } : { bg: h.wash, color: h.onWash }
+      const iconCell = nb(` ${icon || '■'} `)
+      if (nerd)
+        return [
+          { s: ARROW_IN, color: h.solid },
+          { ...head, s: iconCell, bold: true },
+          { s: ARROW_OUT, color: h.solid, bg: h.wash },
+          ...pad(label('', word, detail, body), body),
+          { s: ARROW_OUT, color: h.wash },
+        ]
+      return [{ ...head, s: iconCell, bold: true }, ...pad(label('', word, detail, body), body)]
+    }
     case 'status':
-      return [
-        { s: '▐', color: h.wash },
-        { s: nb(`${g ? g + ' ' : ''}${shown}`), bg: h.wash, color: h.fg, bold: true },
-        { s: '▌', color: h.wash },
-      ]
-    case 'ask':
-      return [{ s: nb(`${g ? g + ' ' : ''}${shown}`), color: h.solid, bold: true, underline: true }]
-    case 'flag':
-      return [
-        { s: '▌', color: h.solid },
-        { s: nb(` ${shown} `), bg: h.wash, color: h.fg, bold: true },
-      ]
+    case 'mode': {
+      const fill = { bg: h.wash, color: h.onWash }
+      const upper = w.family === 'mode'
+      if (nerd) return [{ s: ROUND[0]!, color: h.wash }, ...label(icon, word, detail, fill, upper), { s: ROUND[1]!, color: h.wash }]
+      if (upper) return pad(label(icon, word, detail, fill, true), fill)
+      return [{ s: '▐', color: h.wash }, ...label(icon, word, detail, fill), { s: '▌', color: h.wash }]
+    }
+    case 'ask': {
+      const runs = label('', word, detail, { color: h.text, underline: true })
+      return [{ s: nb(`${icon} `), color: h.text, bold: true }, ...runs]
+    }
+    case 'flag': {
+      const body = { bg: h.wash, color: h.onWash }
+      return [{ s: '▌', color: h.solid }, ...pad(label(nerd ? icon : '', word, detail, body), body), ...(nerd ? [{ s: ROUND[1]!, color: h.wash }] : [])]
+    }
     case 'job':
-      return [
-        { s: '[', dim: true },
-        { s: nb(`${g ? g + ' ' : ''}${shown}`), color: h.fg, bold: true },
-        { s: ']', dim: true },
-      ]
+      return [{ s: '[', dim: true }, ...label(icon, word, detail, { color: h.text }), { s: ']', dim: true }]
     case 'owner':
-      return [{ s: nb(`@${shown.toLowerCase()}`), color: h.fg, underline: true }]
-    case 'hazard':
-      return [
-        { s: '▚', color: '#101010', bg: h.solid },
-        { s: nb(` ${shown.toUpperCase()} `), bg: h.solid, color: '#ffffff', bold: true },
-        { s: '▚', color: '#101010', bg: h.solid },
-      ]
+      return [{ s: nb(`${nerd ? icon + ' ' : ''}@${word.toLowerCase()}${detail}`), color: h.text, bold: true }]
+    case 'hazard': {
+      const fill = { bg: h.solid, color: h.onSolid }
+      if (nerd) return [{ s: SLANT[0]!, color: h.solid }, ...label(icon, word, detail, fill, true), { s: SLANT[1]!, color: h.solid }]
+      const tape = { ...fill, s: '╱╱' }
+      return [tape, ...pad(label('', word, detail, fill, true), fill), tape]
+    }
     case 'context':
-      return [{ s: nb(`‹ ${shown} ›`), dim: true }]
-    case 'mode':
-      return [{ s: nb(` ${g ? g + ' ' : ''}${shown.toUpperCase()} `), color: h.fg, bg: h.wash, bold: true }]
+      return [{ s: nb(`‹ ${whole} ›`), dim: true }]
   }
 }
 
-/** Nerd Font icons for a `##` heading or a line's leading bold label. */
-export const LABEL_ICONS: Record<string, string> = {
-  question: '', answer: '', data: '', cohort: '', method: '', model: '',
-  result: '', effect: '', evidence: '', caveat: '', gate: '', deviation: '',
-  claim: '', cause: '', fix: '', risk: '', next: '', decision: '',
-  status: '', plan: '', why: '', how: '',
-}
+/** Bold lead labels the rules suggest; they are drawn in the label color, without icons. */
+export const LEAD_LABELS = [
+  'Question', 'Answer', 'Data', 'Cohort', 'Method', 'Model', 'Result', 'Effect', 'Evidence', 'Caveat', 'Gate',
+  'Deviation', 'Claim', 'Cause', 'Fix', 'Risk', 'Next', 'Decision', 'Status', 'Plan', 'Why', 'How',
+]
 /** Bold lead-ins that name the action a pill calls for. */
 export const ACTION_WORDS = ['Check', 'Do', 'Next', 'Unblock', 'Left', 'Run', 'Guard', 'Undo', 'See', 'Logged']
 const NERD_ACTION: Record<string, string> = {
@@ -319,13 +288,10 @@ const NERD_ACTION: Record<string, string> = {
   undo: '', see: '', logged: '',
 }
 
-const OWN_ICON = /^\s*([-]|[\u{f0000}-\u{ffffd}])\s*/u
-
-function labelIcon(label: string, set: Settings, isLead: boolean): string | undefined {
-  if (set.icons !== 'nerd-font' || OWN_ICON.test(label)) return undefined
-  const word = label.replace(/[:\s]+$/, '').trim().toLowerCase()
-  if (isLead && LABEL_ICONS[word]) return LABEL_ICONS[word]
-  return label.trimEnd().endsWith(':') ? NERD_ACTION[word] : undefined
+/** In nerd-font mode, an action lead-in such as **Next:** gets its icon. */
+function actionIcon(inner: string, set: Settings): string | undefined {
+  if (set.icons !== 'nerd-font' || !inner.trimEnd().endsWith(':')) return undefined
+  return NERD_ACTION[inner.replace(/[:\s]+$/, '').trim().toLowerCase()]
 }
 
 const PILL = /^\[\[([^[\]\n]{1,32})\]\]/
@@ -359,13 +325,31 @@ export function parseInline(src: string, set: Settings, base: Run = { s: '' }, l
       if (close > i) {
         let code = src.slice(i + ticks.length, close)
         if (code.length > 2 && code.startsWith(' ') && code.endsWith(' ')) code = code.slice(1, -1)
-        push({ ...base, s: code, color: 'permission', bold: base.bold, bg: set.palette === 'bright' ? undefined : '#30343f' })
+        push({ ...base, s: code, color: 'permission', bold: base.bold, bg: codeBg(set) })
         i = close + ticks.length
         continue
       }
       buf += ticks
       i += ticks.length
       continue
+    }
+    if (ch === '<' || ch === 'h') {
+      // <https://…> and bare https:// addresses become links, as Claude Code's own renderer does.
+      const angle = ch === '<' ? /^<((?:https?|file):\/\/[^\s>]+)>/.exec(rest) : null
+      const bare = ch === 'h' && (i === 0 || /[\s(\[]/.test(src[i - 1]!)) ? /^https?:\/\/[^\s<>]+/.exec(rest) : null
+      if (angle) {
+        push({ ...base, s: angle[1]!, href: angle[1]!, color: swatches(set).blue.text, underline: true })
+        i += angle[0].length
+        continue
+      }
+      if (bare) {
+        // Trailing punctuation and an unmatched closing bracket belong to the sentence, not the address.
+        let url = bare[0].replace(/[.,;:!?'"]+$/, '')
+        if (url.endsWith(')') && (url.match(/\(/g) ?? []).length < (url.match(/\)/g) ?? []).length) url = url.slice(0, -1)
+        push({ ...base, s: url, href: url, color: swatches(set).blue.text, underline: true })
+        i += url.length
+        continue
+      }
     }
     if (ch === '[') {
       const pill = PILL.exec(rest)
@@ -378,7 +362,7 @@ export function parseInline(src: string, set: Settings, base: Run = { s: '' }, l
       const link = LINK.exec(rest)
       if (link) {
         flush()
-        out.push(...parseInline(link[1]!, set, { ...base, href: link[2]!, color: 'suggestion', underline: true }))
+        out.push(...parseInline(link[1]!, set, { ...base, href: link[2]!, color: swatches(set).blue.text, underline: true }))
         i += link[0].length
         continue
       }
@@ -389,9 +373,12 @@ export function parseInline(src: string, set: Settings, base: Run = { s: '' }, l
       const inner = close > i + 2 ? src.slice(i + 2, close) : ''
       if (inner && !/^\s/.test(inner) && !/\s$/.test(inner)) {
         flush()
-        const style: Run = { ...base, s: '', bold: true, ...(set.boldColor ? { color: set.boldColor } : {}) }
-        const icon = labelIcon(inner, set, i === leadAt && inner.length <= 32)
-        if (icon) out.push({ ...style, s: `${icon} ` })
+        // A lead label (bold at the start of a line, or ending in a colon) takes the label color;
+        // bold inside a sentence stays the text color, so it is not mistaken for a link.
+        const isLabel = i === leadAt || /:\s*$/.test(inner)
+        const style: Run = { ...base, s: '', bold: true, ...(isLabel && set.boldColor ? { color: set.boldColor } : {}) }
+        const icon = actionIcon(inner, set)
+        if (icon) out.push({ ...style, s: `${icon}\u00a0` })
         out.push(...parseInline(inner, set, style))
         i = close + 2
         continue
@@ -529,7 +516,9 @@ export function parseBlocks(markdown: string, set: Settings): Block[] {
   }
   close()
   flushMd()
-  const withTables = blocks.flatMap(b => (b.k === 'md' ? splitTables(b.text, set) : [b]))
+  const withTables = blocks
+    .flatMap(b => (b.k === 'md' ? splitTables(b.text, set) : [b]))
+    .filter((b, i, all) => !(b.k === 'blank' && all[i - 1]?.k === 'blank'))
   blocks.length = 0
   blocks.push(...withTables)
   while (blocks.length && blocks[blocks.length - 1]!.k === 'blank') blocks.pop()
@@ -572,12 +561,13 @@ export function replyGuidance(): string {
   return `<reply_style>
 These rules shape replies in this terminal. A display plugin draws \`[[Word]]\` pills in a shape and color per family and colors bold text; the stored message keeps plain Markdown.
 
-- **Brief first.** A reply that reports an investigation, an analysis, a run, a change, or proposes what to do next opens with a brief: one paragraph of one to three sentences that starts with a mode pill and says what was checked, done or proposed, the outcome, and anything the user must do. The display draws it as a card. The details follow after a blank line. Skip the brief for short answers, conceptual explanations, and manuscript text.
+- **Brief first.** A reply that reports an investigation, an analysis, a run, a change, or proposes what to do next opens with a brief: one paragraph of one to three sentences that starts with a mode pill and says what was checked, done or proposed, the outcome, and anything the user must do. The display draws it as a card. Write the brief as plain sentences: no other pills and no bold inside it. The details follow after a blank line. Skip the brief for short answers, conceptual explanations, and manuscript text.
 - **Pills mark status, evidence and decisions only.** A pill is \`[[Word]]\` beside the thing it describes. Use exactly these words; a known word may carry short detail ([[Completed 16/16]], [[Deviation D75]]). Any other word is drawn as a dim tag.
 ${families}
+- **Same place every time.** Put a verdict right after the bold lead label it answers; put an evidence tag at the end of the claim it qualifies; start a line with an ask. At most two pills on a line, except a row of job states; when a reply would need more than about eight pills, put the items in a table with one column of pills.
 - **Every attention pill carries its action.** After [[Unverified]], [[Gate missed]], [[Failed]], [[Blocked]], [[Needs you]], [[Decision]], [[Deviation]], a hazard or a failed job, give the one fact needed to act, introduced by a bold lead-in ending in a colon: ${ACTION_WORDS.map(w => `**${w}:**`).join(', ')}.
 - **Statistics stay in words and numbers.** Report effects with their CI or adjusted p in plain text; do not make significance into a pill. [[Underpowered]] is the exception.
-- **Bold the anchor terms**, one to three per paragraph: the dataset, model, cohort, decision or option the sentence turns on. Preferred bold lead labels: ${Object.keys(LABEL_ICONS).map(w => w[0]!.toUpperCase() + w.slice(1)).join(', ')}.
+- **Bold lead labels, sparingly elsewhere.** Start a bullet that is about one subject with a bold lead label ending in a colon (**Cause:**); the display colors it. Inside sentences, bold at most one or two anchor terms per paragraph (the dataset, model, cohort or option the sentence turns on). Preferred lead labels: ${LEAD_LABELS.join(', ')}.
 - **Keep text that will be copied clean.** No pills, bold color labels or tree shapes in manuscript paragraphs (give those as blockquotes, drawn at full brightness), paths, commands, code, literal output, or anything written to a file.
 - **Shape follows information.** \`├──\` and \`└──\` for what belongs to what, \`→\` for a sequence, \`✓\` or \`✗\` beside a checked item.
 </reply_style>`
@@ -618,8 +608,15 @@ function splitTables(text: string, set: Settings): Block[] {
   const out: Block[] = []
   let md: string[] = []
   let fence: string | undefined
+  // Blank lines that separated a code block or text from a table are kept as blank blocks.
   const flush = () => {
-    if (md.length) out.push({ k: 'md', text: md.join('\n') })
+    let lead = 0
+    while (lead < md.length && !md[lead]!.trim()) lead++
+    let tail = md.length
+    while (tail > lead && !md[tail - 1]!.trim()) tail--
+    if (lead > 0 && out.length) out.push({ k: 'blank' })
+    if (tail > lead) out.push({ k: 'md', text: md.slice(lead, tail).join('\n') })
+    if (tail < md.length && tail > lead) out.push({ k: 'blank' })
     md = []
   }
   for (let i = 0; i < lines.length; i++) {
@@ -695,15 +692,30 @@ export function readAgentMessage(raw: string): { body: string; states: string[] 
   }
   // Inline: shouted words become pills; job ids are bold.
   let marked = body
-  for (const [re, word] of SHOUTED) marked = marked.replace(re, `[[${word}]]`)
+  // A colon right after a shouted word ("HANDED OVER:") is dropped: the pill already sets it apart.
+  for (const [re, word] of SHOUTED) marked = marked.replace(new RegExp(re.source + ':?', 'g'), `[[${word}]]`)
   marked = marked.replace(/\b([Jj]ob|[Aa]rray)\s+(\d{6,10})\b/g, '$1 **$2**')
   return { body: marked, states }
 }
 
 /** A stable hue per sender, so each agent keeps its color. */
-export function senderColor(name: string): string {
+export function senderColor(name: string, set: Settings): string {
   const hues: Hue[] = ['cyan', 'violet', 'green', 'amber', 'blue', 'magenta']
   let h = 0
   for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0
-  return HUES[hues[h % hues.length]!].fg
+  return swatches(set)[hues[h % hues.length]!].text
+}
+
+
+/** Runs grouped for drawing: consecutive runs of the same link become one group. */
+export type Piece = { run: Run } | { href: string; runs: Run[] }
+export function groupLinks(runs: Run[]): Piece[] {
+  const out: Piece[] = []
+  for (const run of runs) {
+    const last = out[out.length - 1]
+    if (run.href && last && 'href' in last && last.href === run.href) last.runs.push(run)
+    else if (run.href) out.push({ href: run.href, runs: [run] })
+    else out.push({ run })
+  }
+  return out
 }

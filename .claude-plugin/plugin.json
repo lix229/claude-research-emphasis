@@ -17,17 +17,19 @@
     "boldColor": {
       "type": "string",
       "title": "Bold color",
-      "description": "Theme key or color name for bold text (empty keeps the normal text color)",
+      "description": "Color of bold lead labels such as **Cause:** (a theme key such as suggestion, a color name or hex); empty keeps the text color. Bold inside a sentence always keeps the text color.",
       "default": "suggestion"
     },
     "palette": {
       "type": "string",
-      "title": "Pill palette",
-      "description": "tinted: soft chips for a dark theme; bright: solid chips in the theme's own colors (use on a light theme)",
-      "default": "tinted",
+      "title": "Palette",
+      "description": "auto: follow the Claude Code theme (light themes get light colors; colorblind and ANSI themes get the theme's own colors); dark; light; theme: Claude Code's theme colors with solid chips",
+      "default": "auto",
       "options": [
-        "tinted",
-        "bright"
+        "auto",
+        "dark",
+        "light",
+        "theme"
       ]
     }
   },

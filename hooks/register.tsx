@@ -1,50 +1,84 @@
 import type { Register } from 'claude-code'
 
-import { parseBlocks, parseInline, pillRuns, readAgentMessage, senderColor, type IconSet, type Run, type Settings } from './emphasis'
+import { groupLinks, parseBlocks, parseInline, pillRuns, readAgentMessage, senderColor, type IconSet, type Run, type Settings } from './emphasis'
+
+/** The Claude Code theme's name, read once from the /config rows and kept current by config.set. */
+let themeName: string | undefined
+
+async function readTheme($: { config: { list: () => Promise<readonly { key: string; value: unknown }[]> } }): Promise<string> {
+  if (themeName === undefined) {
+    try {
+      const row = (await $.config.list()).find(r => r.key === 'theme')
+      themeName = typeof row?.value === 'string' ? row.value : ''
+    } catch {
+      themeName = ''
+    }
+  }
+  return themeName
+}
 
 export const register: Register = (on, options) => {
   const icons: IconSet = options.icons === 'nerd-font' || options.icons === 'none' ? options.icons : 'unicode'
   const settings: Settings = {
     icons,
     boldColor: typeof options.boldColor === 'string' ? options.boldColor.trim() : 'suggestion',
-    palette: options.palette === 'bright' ? 'bright' : 'tinted',
   }
+
+  // Palette: a fixed choice, or (auto) one that follows the Claude Code theme. Light themes get the
+  // light colors; colorblind (daltonized) and terminal-palette (ANSI) themes get the theme's own colors.
+  const chosen = options.palette === 'bright' ? 'theme' : options.palette
+  const fixed = chosen === 'dark' || chosen === 'light' || chosen === 'theme' ? chosen : undefined
+  const paletteFor = (theme: string): 'dark' | 'light' | 'theme' =>
+    fixed ?? (/ansi|daltonized/.test(theme) ? 'theme' : theme.startsWith('light') ? 'light' : 'dark')
+  on('config.set', { key: 'theme' }, async ($, e, next) => {
+    const result = await next(e)
+    if (typeof e.value === 'string') themeName = e.value
+    return result
+  })
   // Messages from teammates, subagents and other sessions, and background-task notifications:
   // a colored sender, the states the message reports as pills, and the head of the body.
   on('ui.render', { component: 'UserMessage' }, async ($, e, next) => {
     const { from, task, origin, isExpanded, text } = e.props
     const isTask = origin.kind === 'task-notification'
     if ((!from && !isTask) || isExpanded) return next(e)
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Text, Link } = $.ui.resolve(e)
+    const set: Settings = { ...settings, palette: paletteFor(fixed ? '' : await readTheme($)) }
     const name = from?.name ?? (task?.type ? task.type.replace(/_/g, ' ') : 'background task')
     const { body, states } = readAgentMessage(text)
     if (task?.status) {
       const word = task.status === 'completed' ? 'Completed' : task.status === 'failed' ? 'Failed' : task.status === 'killed' ? 'Cancelled' : task.status
       if (!states.includes(word)) states.unshift(word)
     }
+    const one = (r: Run) => (
+      <Text color={r.color} backgroundColor={r.bg} bold={r.bold} italic={r.italic} underline={r.underline} dimColor={r.dim}>
+        {r.s}
+      </Text>
+    )
+    // A link is a real hyperlink (OSC 8); where the terminal has none, Claude Code prints the address after it.
+    // A bare address is its own label, so it is drawn label-less and printed once.
     const paint = (rs: Run[]) =>
-      rs.map(r => (
-        <Text color={r.color} backgroundColor={r.bg} bold={r.bold} italic={r.italic} underline={r.underline} dimColor={r.dim}>
-          {r.s}
-        </Text>
-      ))
+      groupLinks(rs).map(p =>
+        !('href' in p) ? one(p.run) : p.runs.map(x => x.s).join('') === p.href ? <Link href={p.href} /> : <Link href={p.href}>{p.runs.map(one)}</Link>,
+      )
     const lines = body.split('\n').map(l => l.trim()).filter(Boolean)
     const head = lines.slice(0, 3)
     return (
       <Box flexDirection="column">
         <Text>
-          <Text color={senderColor(name)} bold>
+          <Text color={senderColor(name, set)} bold>
             {'◆ ' + name}
           </Text>
-          {states.slice(0, 4).flatMap(w => [<Text> </Text>, ...paint(pillRuns(w, settings))])}
+          {states.slice(0, 4).flatMap(w => [<Text> </Text>, ...paint(pillRuns(w, set))])}
         </Text>
         {head.map(l => (
           <Box flexDirection="row">
             <Text dimColor>{'  │ '}</Text>
-            <Text wrap="truncate-end">{paint(parseInline(l, settings))}</Text>
+            <Text wrap="truncate-end">{paint(parseInline(l, set))}</Text>
           </Box>
         ))}
-        {lines.length > head.length ? <Text dimColor>{`  └ ${lines.length - head.length} more lines · ctrl+o`}</Text> : null}
+        {lines.length > head.length ? (
+          <Text dimColor>{`  └ ${lines.length - head.length} more ${lines.length - head.length === 1 ? 'line' : 'lines'} · ctrl+o to expand`}</Text>
+        ) : null}
       </Box>
     )
   })
@@ -52,24 +86,23 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
     if (e.props.isSummary) return next(e)
     const cols = e.viewport?.columns
-    const blocks = parseBlocks(e.props.text, cols ? { ...settings, maxWidth: cols - 4 } : settings)
+    const set: Settings = { ...settings, palette: paletteFor(fixed ? '' : await readTheme($)) }
+    const blocks = parseBlocks(e.props.text, cols ? { ...set, maxWidth: cols - 4 } : set)
     if (blocks.every(b => b.k === 'md' || b.k === 'blank')) return next(e)
 
-    const { Box, Text, Markdown } = $.ui.resolve(e)
+    const { Box, Text, Markdown, Link } = $.ui.resolve(e)
 
+    const one = (r: Run) => (
+      <Text color={r.color} backgroundColor={r.bg} bold={r.bold} italic={r.italic} underline={r.underline} dimColor={r.dim}>
+        {r.s}
+      </Text>
+    )
+    // A link is a real hyperlink (OSC 8); where the terminal has none, Claude Code prints the address after it.
+    // A bare address is its own label, so it is drawn label-less and printed once.
     const runs = (rs: Run[]) =>
-      rs.map(r => (
-        <Text
-          color={r.color}
-          backgroundColor={r.bg}
-          bold={r.bold}
-          italic={r.italic}
-          underline={r.underline}
-          dimColor={r.dim}
-        >
-          {r.s}
-        </Text>
-      ))
+      groupLinks(rs).map(p =>
+        !('href' in p) ? one(p.run) : p.runs.map(x => x.s).join('') === p.href ? <Link href={p.href} /> : <Link href={p.href}>{p.runs.map(one)}</Link>,
+      )
 
     const body = blocks.map(b => {
       switch (b.k) {
