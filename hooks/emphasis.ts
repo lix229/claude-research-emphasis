@@ -34,7 +34,7 @@ export type Settings = { icons: IconSet; boldColor: string; palette?: 'dark' | '
 /**
  * Pill families. Each family has its own shape, so a glance tells evidence from a gate from a job.
  * Unicode mode (any font) / nerd-font mode:
- *   evidence  ◉ Observed           colored word with a mark, no background
+ *   evidence  ▏● Observed ▕        filled chip with thin colored edges
  *   verdict   ✓ CONFIRMED          solid stamp, capitals (nerd: rounded)
  *   gate      ▲│Gate met           two-tone badge: solid icon cell, soft label (nerd: arrow ends)
  *   status    ▐✓ Done▌             soft chip (nerd: rounded)
@@ -119,10 +119,10 @@ export const WORDS: Record<string, Word> = {
   Changed: { family: 'mode', hue: 'green', glyph: '✎', meaning: 'I edited files, data or jobs' },
   Ran: { family: 'mode', hue: 'blue', glyph: '▶', meaning: 'I ran an analysis, test or job' },
   // Evidence: where a claim comes from.
-  Observed: { family: 'evidence', hue: 'grey', glyph: '●', meaning: 'checked on disk or in a run' },
-  Inferred: { family: 'evidence', hue: 'grey', glyph: '◐', meaning: 'reasoned from other evidence' },
+  Observed: { family: 'evidence', hue: 'cyan', glyph: '●', meaning: 'checked on disk or in a run' },
+  Inferred: { family: 'evidence', hue: 'blue', glyph: '◐', meaning: 'reasoned from other evidence' },
   Unverified: { family: 'evidence', hue: 'amber', glyph: '○', meaning: 'not checked' },
-  Cited: { family: 'evidence', hue: 'grey', glyph: '§', meaning: 'taken from a paper or doc, not checked here' },
+  Cited: { family: 'evidence', hue: 'violet', glyph: '§', meaning: 'taken from a paper or doc, not checked here' },
   // Verdict on a claim the user made.
   Confirmed: { family: 'verdict', hue: 'green', glyph: '✓', meaning: 'the claim holds' },
   Corrected: { family: 'verdict', hue: 'amber', glyph: '±', meaning: 'the claim is partly wrong' },
@@ -233,8 +233,14 @@ export function pillRuns(text: string, set: Settings): Run[] {
   const icon = set.icons === 'none' ? '' : nerd ? (NERD_ICONS[word] ?? w.glyph) : w.glyph
   const pad = (runs: Run[], style: Partial<Run>): Run[] => [{ ...style, s: ' ' }, ...runs, { ...style, s: ' ' }]
   switch (w.family) {
-    case 'evidence':
-      return label(icon, word, detail, { color: h.text })
+    case 'evidence': {
+      // A filled chip with thin colored edges, so evidence reads apart from status chips (which have
+      // half-block or rounded ends). With theme colors the chip is unfilled: edges and text only.
+      const themed = set.palette === 'theme'
+      const fill = themed ? { color: h.text } : { bg: h.wash, color: h.onWash }
+      const edge = themed ? { color: h.text } : { bg: h.wash, color: h.solid }
+      return [{ ...edge, s: '▏' }, ...pad(label(icon, word, detail, fill), fill), { ...edge, s: '▕' }]
+    }
     case 'verdict': {
       const fill = { bg: h.solid, color: h.onSolid }
       if (nerd) return [{ s: ROUND[0]!, color: h.solid }, ...label(icon, word, detail, fill, true), { s: ROUND[1]!, color: h.solid }]
