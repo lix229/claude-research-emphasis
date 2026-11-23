@@ -370,7 +370,8 @@ export function parseInline(src: string, set: Settings, base: Run = { s: '' }, l
     if (ch === '[') {
       const pill = PILL.exec(rest)
       if (pill && pill[1]!.trim()) {
-        if (buf.endsWith(' ')) buf = buf.slice(0, -1) + '\u00a0'
+        // Stick to the word before it, never to a pill before it: a row of pills must still wrap between pills.
+        if (buf.endsWith(' ') && buf.trim()) buf = buf.slice(0, -1) + '\u00a0'
         flush()
         out.push(...pillRuns(pill[1]!, set))
         i += pill[0].length
