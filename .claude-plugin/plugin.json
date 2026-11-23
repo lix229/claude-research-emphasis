@@ -17,8 +17,8 @@
     "boldColor": {
       "type": "string",
       "title": "Bold color",
-      "description": "Color of bold lead labels such as **Cause:** (a theme key such as suggestion, a color name or hex); empty keeps the text color. Bold inside a sentence always keeps the text color.",
-      "default": "suggestion"
+      "description": "Color of bold lead labels such as **Cause:** (a theme key such as suggestion, a color name or hex); empty, the default, keeps the text color. Bold inside a sentence always keeps the text color.",
+      "default": ""
     },
     "palette": {
       "type": "string",

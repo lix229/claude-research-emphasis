@@ -21,7 +21,7 @@ export const register: Register = (on, options) => {
   const icons: IconSet = options.icons === 'nerd-font' || options.icons === 'none' ? options.icons : 'unicode'
   const settings: Settings = {
     icons,
-    boldColor: typeof options.boldColor === 'string' ? options.boldColor.trim() : 'suggestion',
+    boldColor: typeof options.boldColor === 'string' ? options.boldColor.trim() : '',
   }
 
   // Palette: a fixed choice, or (auto) one that follows the Claude Code theme. Light themes get the
@@ -65,15 +65,14 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column">
         <Text>
-          <Text color={senderColor(name, set)} bold>
-            {'◆ ' + name}
-          </Text>
+          <Text color={senderColor(name, set)}>{'◆ '}</Text>
+          <Text bold>{name}</Text>
           {states.slice(0, 4).flatMap(w => [<Text> </Text>, ...paint(pillRuns(w, set))])}
         </Text>
         {head.map(l => (
           <Box flexDirection="row">
-            <Text dimColor>{'  │ '}</Text>
-            <Text wrap="truncate-end">{paint(parseInline(l, set))}</Text>
+            <Text color={senderColor(name, set)}>{'  │ '}</Text>
+            <Text>{paint(parseInline(l, set))}</Text>
           </Box>
         ))}
         {lines.length > head.length ? (
@@ -104,7 +103,10 @@ export const register: Register = (on, options) => {
         !('href' in p) ? one(p.run) : p.runs.map(x => x.s).join('') === p.href ? <Link href={p.href} /> : <Link href={p.href}>{p.runs.map(one)}</Link>,
       )
 
-    const body = blocks.map(b => {
+    // A quote or ask box brings its own empty row above and below, so the blank line next to it is dropped.
+    const boxed = (b?: { k: string }) => b?.k === 'quote' || b?.k === 'ask'
+    const shown = blocks.filter((b, i) => !(b.k === 'blank' && (boxed(blocks[i - 1]) || boxed(blocks[i + 1]))))
+    const body = shown.map(b => {
       switch (b.k) {
         case 'md':
           return <Markdown text={b.text} />
@@ -126,17 +128,29 @@ export const register: Register = (on, options) => {
             </Box>
           )
         case 'quote':
+          // A dim bar on every wrapped line; the orange bar is for headings only.
           return (
-            <Box flexDirection="row">
-              <Text color="claude">▎ </Text>
+            <Box borderStyle="quote" borderDimColor paddingLeft={1}>
+              <Text>{runs(b.runs)}</Text>
+            </Box>
+          )
+        case 'ask':
+          // The ask stands apart: an amber bar beside every line of it.
+          return (
+            <Box borderStyle="quote" borderColor={b.bar} paddingLeft={1}>
               <Text>{runs(b.runs)}</Text>
             </Box>
           )
         case 'brief':
+          // The kind of work sits in the card's top border, so the card spends no row on it.
           return (
-            <Box flexDirection="column" borderStyle="round" borderColor={b.border} paddingX={1}>
-              <Text>{runs(b.mode)}</Text>
-              <Text>{runs(b.runs)}</Text>
+            <Box flexDirection="column">
+              <Box flexDirection="column" borderStyle="round" borderColor={b.border} paddingX={1}>
+                <Text>{runs(b.runs)}</Text>
+              </Box>
+              <Box position="absolute" top={0} left={2}>
+                <Text>{runs(b.title)}</Text>
+              </Box>
             </Box>
           )
         case 'item':

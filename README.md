@@ -4,7 +4,7 @@ A Claude Code plugin that makes replies about research work easy to scan. Claude
 
 ![A reply about an overnight fine-tuning run: a brief card, a gate that was met, a table of job states, a corrected claim, a deviation flag and a decision](docs/screenshot.png)
 
-The screenshot uses `icons: nerd-font`. The default, which needs no special font, looks like [this](docs/screenshot-unicode.png).
+The screenshot uses `icons: nerd-font`. The default, which needs no special font, looks like [this](docs/screenshot-unicode.png); on a light theme, like [this](docs/screenshot-light.png).
 
 The plugin changes only what the terminal draws. The stored conversation, copied text and exports keep plain Markdown. It calls no model and costs nothing to run.
 
@@ -43,11 +43,11 @@ Each family of markers has its own shape, so you can tell what kind of marker it
 
 | Family | Words | Shape |
 |---|---|---|
-| Evidence | Observed, Inferred, Unverified, Cited | colored word with a mark, no background |
+| Evidence | Observed, Inferred, Unverified, Cited | quiet annotation; the mark shows the grade (● observed, ◐ inferred, ○ unverified); only Unverified is colored |
 | Verdict on a claim you made | Confirmed, Corrected, Contradicted | solid stamp in capitals |
 | Gates (pre-registered pass/stop thresholds) | Gate met, Gate missed, Fold, Shelve, Exploratory, Underpowered | two-tone badge: a solid icon cell, then a soft label |
 | Work status | Done, Passed, Fixed, Recommended, Failed, Blocked, Partial, Skipped, At risk, Handed over | soft chip |
-| Asks | Needs you, Decision | amber arrow and underlined word |
+| Asks | Needs you, Decision | the one filled amber pill; a paragraph that opens with an ask gets an amber bar beside every line |
 | Disclosure | Deviation | magenta flag |
 | Jobs (Slurm or any scheduler) | Submitted, Queued, Running, Completed, Cancelled, OOM, Killed 143 | `[● Running]`, like a log line |
 | Ownership | Owned, Shared, Foreign | `@foreign` handle |
@@ -58,11 +58,11 @@ A word may carry detail, drawn in regular weight after the bold word: `[[Complet
 
 Also:
 
-- **Brief card.** A reply that opens with a kind-of-work marker has its first paragraph drawn inside a bordered card. The details follow below it.
+- **Brief card.** A reply that opens with a kind-of-work marker has its first paragraph drawn inside a bordered card, with the kind of work in the card's top border. The details follow below it.
 - **Tables.** A table that contains markers is drawn by the plugin, so the markers inside it are colored. A table wider than the window is left to Claude Code's own renderer.
 - **Messages from other agents.** Messages from teammates, subagents and other sessions, and background-task notifications, get a colored sender line. Status words in the message (HANDED OVER, PASSED, FAILED, COMPLETED, RUNNING, OOM) become markers, job ids are bold, and only the first three lines are shown (ctrl+o shows the full message).
 - **Links stay links.** `[label](https://…)`, `<https://…>` and bare `https://` addresses are drawn as clickable hyperlinks, as Claude Code draws them. On a terminal without hyperlink support, the address is printed after the label.
-- **Text.** Bold lead labels such as **Cause:** are colored; bold inside a sentence keeps the text color, so it is not mistaken for a link. `##` headings get an accent bar, blockquotes are drawn at full brightness (for manuscript text you will copy), `✓` / `✗` / `→` are colored, and `├──` / `└──` tree lines are dimmed.
+- **Text.** Color is kept for meaning: bold is plain bold (set `boldColor` to color lead labels such as **Cause:**), inline code is set apart by a tinted background, and links are blue. `##` headings get an accent bar; blockquotes get a dim bar on every line and stay at full brightness (for manuscript text you will copy); `✓` / `✗` / `→` are colored, and `├──` / `└──` tree lines are dimmed.
 - **Colors follow your theme.** On a light Claude Code theme the plugin switches to light colors. On the colorblind (daltonized) and ANSI themes it uses the theme's own colors, so markers stay distinguishable in the palette you chose.
 
 ## Options
@@ -73,7 +73,7 @@ Set these in Claude Code's config menu (`/config`, under the plugin's name), or 
 |---|---|---|
 | `icons` | `unicode` (marks any font draws), `nerd-font` (Nerd Font icons; rounded, arrow and slanted chip ends), `none` | `unicode` |
 | `palette` | `auto` (follow the Claude Code theme), `dark`, `light`, `theme` (Claude Code's theme colors, solid chips) | `auto` |
-| `boldColor` | color of bold lead labels: a theme key such as `suggestion`, a color name or hex; empty keeps the text color | `suggestion` |
+| `boldColor` | color of bold lead labels: a theme key such as `suggestion`, a color name or hex; empty keeps the text color | empty |
 
 ## Changing the words
 

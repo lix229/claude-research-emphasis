@@ -22,7 +22,8 @@ export type Block =
   | { k: 'para'; runs: Run[] }
   | { k: 'item'; indent: number; marker: string; runs: Run[] }
   | { k: 'quote'; runs: Run[] }
-  | { k: 'brief'; mode: Run[]; border: string; runs: Run[] }
+  | { k: 'brief'; title: Run[]; border: string; runs: Run[] }
+  | { k: 'ask'; bar: string; runs: Run[] }
   | { k: 'blank' }
   | { k: 'lines'; lines: Run[][] }
 
@@ -105,9 +106,9 @@ export const NERD_ICONS: Record<string, string> = {
   Done: '', Passed: '', 'Handed over': '', Fixed: '', Recommended: '', Failed: '',
   Blocked: '', Partial: '', Skipped: '', 'At risk': '',
   'Needs you': '', Decision: '', Deviation: '',
-  Submitted: '', Queued: '', Running: '', Cancelled: '', Completed: '', OOM: '', 'Killed 143': '',
+  Submitted: '', Queued: '', Running: '', Cancelled: '', Completed: '', OOM: '', 'Killed 143': '',
   Owned: '', Shared: '', Foreign: '',
-  Destructive: '', Irreversible: '', 'GPU quota': '',
+  Destructive: '', Irreversible: '', 'GPU quota': '',
 }
 
 /** The words the model is told to write, in the order the rules list them. */
@@ -118,10 +119,10 @@ export const WORDS: Record<string, Word> = {
   Changed: { family: 'mode', hue: 'green', glyph: '✎', meaning: 'I edited files, data or jobs' },
   Ran: { family: 'mode', hue: 'blue', glyph: '▶', meaning: 'I ran an analysis, test or job' },
   // Evidence: where a claim comes from.
-  Observed: { family: 'evidence', hue: 'green', glyph: '◉', meaning: 'checked on disk or in a run' },
-  Inferred: { family: 'evidence', hue: 'blue', glyph: '◐', meaning: 'reasoned from other evidence' },
+  Observed: { family: 'evidence', hue: 'grey', glyph: '●', meaning: 'checked on disk or in a run' },
+  Inferred: { family: 'evidence', hue: 'grey', glyph: '◐', meaning: 'reasoned from other evidence' },
   Unverified: { family: 'evidence', hue: 'amber', glyph: '○', meaning: 'not checked' },
-  Cited: { family: 'evidence', hue: 'violet', glyph: '§', meaning: 'taken from a paper or doc, not checked here' },
+  Cited: { family: 'evidence', hue: 'grey', glyph: '§', meaning: 'taken from a paper or doc, not checked here' },
   // Verdict on a claim the user made.
   Confirmed: { family: 'verdict', hue: 'green', glyph: '✓', meaning: 'the claim holds' },
   Corrected: { family: 'verdict', hue: 'amber', glyph: '±', meaning: 'the claim is partly wrong' },
@@ -152,7 +153,7 @@ export const WORDS: Record<string, Word> = {
   // Scheduler jobs.
   Submitted: { family: 'job', hue: 'grey', glyph: '↑', meaning: 'sent to the scheduler' },
   Queued: { family: 'job', hue: 'grey', glyph: '…', meaning: 'waiting in the queue' },
-  Running: { family: 'job', hue: 'cyan', glyph: '●', meaning: 'running' },
+  Running: { family: 'job', hue: 'cyan', glyph: '↻', meaning: 'running' },
   Completed: { family: 'job', hue: 'green', glyph: '✓', meaning: 'exit 0' },
   Cancelled: { family: 'job', hue: 'grey', glyph: '⊘', meaning: 'cancelled' },
   OOM: { family: 'job', hue: 'red', glyph: '✗', meaning: 'out of memory' },
@@ -191,6 +192,15 @@ export function readLabel(label: string): { word: string | undefined; detail: st
   const known = KNOWN.find(k => lower === k || (lower.startsWith(k) && /[ :]/.test(lower[k.length] ?? '')))
   if (!known) return { word: undefined, detail: '', text }
   return { word: KEYS.get(known), detail: text.slice(known.length), text }
+}
+
+/** The brief card's title, drawn over its top border: the mode's mark and word, in its color, no fill. */
+export function modeTitle(text: string, set: Settings): Run[] {
+  const { word } = readLabel(text)
+  const w = word ? WORDS[word] : undefined
+  if (!word || !w) return []
+  const icon = set.icons === 'none' ? '' : set.icons === 'nerd-font' ? (NERD_ICONS[word] ?? w.glyph) : w.glyph
+  return [{ s: nb(` ${icon ? icon + ' ' : ''}${word} `), color: swatches(set)[w.hue].text, bold: true }]
 }
 
 /** The color of a mode word, for the brief card's border; undefined for any other label. */
@@ -254,15 +264,21 @@ export function pillRuns(text: string, set: Settings): Run[] {
       return [{ s: '▐', color: h.wash }, ...label(icon, word, detail, fill), { s: '▌', color: h.wash }]
     }
     case 'ask': {
-      const runs = label('', word, detail, { color: h.text, underline: true })
-      return [{ s: nb(`${icon} `), color: h.text, bold: true }, ...runs]
+      // The one thing the reader must act on: the only filled amber pill.
+      const fill = { bg: h.solid, color: h.onSolid }
+      if (nerd) return [{ s: ROUND[0]!, color: h.solid }, ...label(icon, word, detail, fill), { s: ROUND[1]!, color: h.solid }]
+      return [{ s: '▐', color: h.solid }, ...label(icon, word, detail, fill), { s: '▌', color: h.solid }]
     }
     case 'flag': {
       const body = { bg: h.wash, color: h.onWash }
       return [{ s: '▌', color: h.solid }, ...pad(label(nerd ? icon : '', word, detail, body), body), ...(nerd ? [{ s: ROUND[1]!, color: h.wash }] : [])]
     }
-    case 'job':
-      return [{ s: '[', dim: true }, ...label(icon, word, detail, { color: h.text }), { s: ']', dim: true }]
+    case 'job': {
+      // A job id is a value to copy, not part of the state: it goes after the brackets.
+      const id = /^\s+\d{5,}$/.test(detail) ? detail : ''
+      const state = [{ s: '[', dim: true }, ...label(icon, word, id ? '' : detail, { color: h.text }), { s: ']', dim: true }]
+      return id ? [...state, { s: nb(id) }] : state
+    }
     case 'owner':
       return [{ s: nb(`${nerd ? icon + ' ' : ''}@${word.toLowerCase()}${detail}`), color: h.text, bold: true }]
     case 'hazard': {
@@ -325,7 +341,7 @@ export function parseInline(src: string, set: Settings, base: Run = { s: '' }, l
       if (close > i) {
         let code = src.slice(i + ticks.length, close)
         if (code.length > 2 && code.startsWith(' ') && code.endsWith(' ')) code = code.slice(1, -1)
-        push({ ...base, s: code, color: 'permission', bold: base.bold, bg: codeBg(set) })
+        push({ ...base, s: code, bold: base.bold, bg: codeBg(set) ?? undefined, ...(codeBg(set) ? {} : { color: 'permission' }) })
         i = close + ticks.length
         continue
       }
@@ -354,6 +370,7 @@ export function parseInline(src: string, set: Settings, base: Run = { s: '' }, l
     if (ch === '[') {
       const pill = PILL.exec(rest)
       if (pill && pill[1]!.trim()) {
+        if (buf.endsWith(' ')) buf = buf.slice(0, -1) + '\u00a0'
         flush()
         out.push(...pillRuns(pill[1]!, set))
         i += pill[0].length
@@ -491,7 +508,11 @@ export function parseBlocks(markdown: string, set: Settings): Block[] {
     const q = line.match(QUOTE)
     if (q) {
       close()
-      blocks.push({ k: 'quote', runs: parseInline(q[1]!, set, { s: '' }) })
+      // Consecutive quote lines are one quote, so its bar runs unbroken down the side.
+      const prev = blocks[blocks.length - 1]
+      const runs = parseInline(q[1]!, set, { s: '' })
+      if (prev?.k === 'quote') prev.runs.push({ s: '\n' }, ...runs)
+      else blocks.push({ k: 'quote', runs })
       continue
     }
     // Tree rows and lines that open with a bold label start their own line.
@@ -510,6 +531,10 @@ export function parseBlocks(markdown: string, set: Settings): Block[] {
       raw: body,
       make: raw => {
         if (blocks.length === 0 && firstRaw === undefined) firstRaw = raw
+        const opener = /^\[\[([^[\]\n]{1,32})\]\]/.exec(raw)
+        const openWord = opener ? readLabel(opener[1]!).word : undefined
+        if (!pad && openWord && WORDS[openWord]?.family === 'ask')
+          return { k: 'ask', bar: swatches(set).amber.solid, runs: parseInline(raw, set, { s: '' }, lead) }
         return { k: 'para', runs: [...(pad ? [{ s: pad }] : []), ...parseInline(raw, set, { s: '' }, lead)] }
       },
     }
@@ -529,7 +554,7 @@ export function parseBlocks(markdown: string, set: Settings): Block[] {
   if (lead && border && blocks[0]?.k === 'para') {
     blocks[0] = {
       k: 'brief',
-      mode: pillRuns(lead[1]!, set),
+      title: modeTitle(lead[1]!, set),
       border,
       runs: parseInline(firstRaw!.slice(lead[0].length), set, { s: '' }),
     }
@@ -539,11 +564,11 @@ export function parseBlocks(markdown: string, set: Settings): Block[] {
 
 const FAMILY_RULES: [Family, string][] = [
   ['mode', 'Kind of work. Opens the brief (see below); nowhere else'],
-  ['evidence', 'Where a claim comes from. Mark every factual claim about data, results or code whose source is not obvious'],
+  ['evidence', 'Where a claim comes from; drawn quietly, as an annotation. Mark every factual claim about data, results or code whose source is not obvious'],
   ['verdict', 'When the user states or asks you to confirm a claim, open the answer with one of these'],
   ['gate', 'Pre-registered pass/stop thresholds for an experiment and their outcomes. A miss starts an investigation of why, never a verdict on its own; Fold only after an independent review agrees'],
   ['status', 'State of a piece of work'],
-  ['ask', 'Something only the user can do or decide. Repeat each one in the last line of a long reply'],
+  ['ask', 'Something only the user can do or decide. Start its own paragraph with it, after a blank line, at the end of the reply; the display draws that paragraph with an amber bar. Repeat each one there in a long reply'],
   ['flag', 'Any fallback, compromise or change of plan the user was not told about beforehand. Follow it with **Logged:** and the path of the .md that records it'],
   ['job', 'Slurm job states; may carry the job id or counts, e.g. [[Completed 16/16]], [[OOM 52084096]]'],
   ['owner', 'Who owns data, derivatives, code or config you touched or propose to touch'],
@@ -564,7 +589,7 @@ These rules shape replies in this terminal. A display plugin draws \`[[Word]]\` 
 - **Brief first.** A reply that reports an investigation, an analysis, a run, a change, or proposes what to do next opens with a brief: one paragraph of one to three sentences that starts with a mode pill and says what was checked, done or proposed, the outcome, and anything the user must do. The display draws it as a card. Write the brief as plain sentences: no other pills and no bold inside it. The details follow after a blank line. Skip the brief for short answers, conceptual explanations, and manuscript text.
 - **Pills mark status, evidence and decisions only.** A pill is \`[[Word]]\` beside the thing it describes. Use exactly these words; a known word may carry short detail ([[Completed 16/16]], [[Deviation D75]]). Any other word is drawn as a dim tag.
 ${families}
-- **Same place every time.** Put a verdict right after the bold lead label it answers; put an evidence tag at the end of the claim it qualifies; start a line with an ask. At most two pills on a line, except a row of job states; when a reply would need more than about eight pills, put the items in a table with one column of pills.
+- **Same place every time.** Put a verdict right after the bold lead label it answers; put an evidence tag at the end of the claim it qualifies; start a paragraph with an ask. At most two pills on a line, except a row of job states; when a reply would need more than about eight pills, put the items in a table with one column of pills.
 - **Every attention pill carries its action.** After [[Unverified]], [[Gate missed]], [[Failed]], [[Blocked]], [[Needs you]], [[Decision]], [[Deviation]], a hazard or a failed job, give the one fact needed to act, introduced by a bold lead-in ending in a colon: ${ACTION_WORDS.map(w => `**${w}:**`).join(', ')}.
 - **Statistics stay in words and numbers.** Report effects with their CI or adjusted p in plain text; do not make significance into a pill. [[Underpowered]] is the exception.
 - **Bold lead labels, sparingly elsewhere.** Start a bullet that is about one subject with a bold lead label ending in a colon (**Cause:**); the display colors it. Inside sentences, bold at most one or two anchor terms per paragraph (the dataset, model, cohort or option the sentence turns on). Preferred lead labels: ${LEAD_LABELS.join(', ')}.
@@ -694,13 +719,13 @@ export function readAgentMessage(raw: string): { body: string; states: string[] 
   let marked = body
   // A colon right after a shouted word ("HANDED OVER:") is dropped: the pill already sets it apart.
   for (const [re, word] of SHOUTED) marked = marked.replace(new RegExp(re.source + ':?', 'g'), `[[${word}]]`)
-  marked = marked.replace(/\b([Jj]ob|[Aa]rray)\s+(\d{6,10})\b/g, '$1 **$2**')
+  marked = marked.replace(/\b([Jj]ob|[Aa]rray)\s+(\d{6,10})\b/g, '$1 `$2`')
   return { body: marked, states }
 }
 
 /** A stable hue per sender, so each agent keeps its color. */
 export function senderColor(name: string, set: Settings): string {
-  const hues: Hue[] = ['cyan', 'violet', 'green', 'amber', 'blue', 'magenta']
+  const hues: Hue[] = ['violet', 'blue', 'magenta', 'cyan']
   let h = 0
   for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0
   return swatches(set)[hues[h % hues.length]!].text
