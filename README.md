@@ -45,7 +45,7 @@ Each family of markers has its own shape, so you can tell what kind of marker it
 
 | Family | Words | Shape |
 |---|---|---|
-| Evidence | Observed, Inferred, Unverified, Cited | filled chip with thin colored edges; the mark shows the grade (● observed, ◐ inferred, ○ unverified, § cited) |
+| Evidence | Observed, Inferred, Unverified, Cited | filled chip with thin colored edges, at the start of the bullet or paragraph it qualifies (a single tag written at the end is moved there); the mark shows the grade (● observed, ◐ inferred, ○ unverified, § cited) |
 | Verdict on a claim you made | Confirmed, Corrected, Contradicted | solid stamp in capitals |
 | Gates (pre-registered pass/stop thresholds) | Gate met, Gate missed, Fold, Shelve, Exploratory, Underpowered | two-tone badge: a solid icon cell, then a soft label |
 | Work status | Done, Passed, Fixed, Recommended, Failed, Blocked, Partial, Skipped, At risk, Handed over | soft chip |

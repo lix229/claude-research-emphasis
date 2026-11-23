@@ -239,7 +239,7 @@ export function pillRuns(text: string, set: Settings): Run[] {
       const themed = set.palette === 'theme'
       const fill = themed ? { color: h.text } : { bg: h.wash, color: h.onWash }
       const edge = themed ? { color: h.text } : { bg: h.wash, color: h.solid }
-      return [{ ...edge, s: '▏' }, ...pad(label(icon, word, detail, fill), fill), { ...edge, s: '▕' }]
+      return [{ ...edge, s: '▏' }, ...label(icon, word, detail, fill), { ...edge, s: '▕' }]
     }
     case 'verdict': {
       const fill = { bg: h.solid, color: h.onSolid }
@@ -317,6 +317,19 @@ function actionIcon(inner: string, set: Settings): string | undefined {
 }
 
 const PILL = /^\[\[([^[\]\n]{1,32})\]\]/
+const ANY_PILL = /\[\[([^[\]\n]{1,32})\]\]/g
+
+/**
+ * An evidence tag leads the bullet or paragraph it qualifies, so tags line up at the left. A single
+ * tag written at the end is moved to the front; with several tags, each stays where it was written.
+ */
+export function leadEvidence(raw: string): string {
+  const tags = [...raw.matchAll(ANY_PILL)].filter(m => WORDS[readLabel(m[1]!).word ?? '']?.family === 'evidence')
+  if (tags.length !== 1) return raw
+  const tag = tags[0]!
+  if (tag.index! + tag[0].length !== raw.trimEnd().length || tag.index === 0) return raw
+  return `${tag[0]} ${raw.slice(0, tag.index).trimEnd()}`
+}
 const LINK = /^\[([^\]\n]+)\]\(([^()\s]+)\)/
 const ESCAPABLE = /[\\`*_[\]()#+\-.!~|>{}]/
 
@@ -510,7 +523,7 @@ export function parseBlocks(markdown: string, set: Settings): Block[] {
       let lead = 0
       const conn = /^(?:[├└]──\s*)/.exec(item[3]!)
       if (conn) lead = conn[0].length
-      open = { raw: item[3]!, make: raw => ({ k: 'item', indent, marker, runs: parseInline(raw, set, { s: '' }, lead) }) }
+      open = { raw: item[3]!, make: raw => ({ k: 'item', indent, marker, runs: parseInline(leadEvidence(raw), set, { s: '' }, lead) }) }
       continue
     }
     const q = line.match(QUOTE)
@@ -543,7 +556,7 @@ export function parseBlocks(markdown: string, set: Settings): Block[] {
         const openWord = opener ? readLabel(opener[1]!).word : undefined
         if (!pad && openWord && WORDS[openWord]?.family === 'ask')
           return { k: 'ask', bar: swatches(set).amber.solid, runs: parseInline(raw, set, { s: '' }, lead) }
-        return { k: 'para', runs: [...(pad ? [{ s: pad }] : []), ...parseInline(raw, set, { s: '' }, lead)] }
+        return { k: 'para', runs: [...(pad ? [{ s: pad }] : []), ...parseInline(leadEvidence(raw), set, { s: '' }, lead)] }
       },
     }
   }
@@ -573,7 +586,7 @@ export function parseBlocks(markdown: string, set: Settings): Block[] {
 /** When each family is required: the trigger the model checks for, in the order a reply is read. */
 const TRIGGERS: [Family, string][] = [
   ['mode', 'The reply reports an investigation, an analysis, a run or a change, or proposes next steps: its first paragraph is the brief, which starts with one of these'],
-  ['evidence', 'You state a finding, a number or a result: end the sentence with where it comes from. When every item of a list has the same source, one tag on the list\'s lead line covers the list'],
+  ['evidence', 'You state a finding, a number or a result: start its bullet or paragraph with where it comes from, before the bold lead label. When claims in one bullet have different sources, split the bullet. When every item of a list has the same source, one tag on the list\'s lead line covers the list'],
   ['status', 'A piece of work has an outcome (done, passed, partly done, failed, blocked): put the status beside it, with a count as detail, such as [[Partial 6/8]]'],
   ['verdict', 'The user stated a claim or asked you to confirm one: open the answer with the verdict'],
   ['ask', 'Something only the user can do or decide: give it its own paragraph at the end of the reply, starting with the ask'],
@@ -588,10 +601,12 @@ const TRIGGERS: [Family, string][] = [
 const EXAMPLE = `[[Ran]] I tested the review skill blind on one published paper. It found 6 of the 8 defects I planted and left the untouched paper's matching passages alone. One decision is needed below.
 
 **Broken copy** [[Partial 6/8]]
-- **Mechanism paragraph:** flagged as the top comment. [[Observed]]
+- [[Observed]] **Mechanism paragraph:** flagged as the top comment.
 - **"little is known" gap:** missed; the new phrase scan now catches it. [[Fixed]]
 
-**Original paper:** it praised the six passages I had broken in the copy. [[Observed]] It holds drafts to his 2023 to 2025 habits rather than the 2021 paper's. [[Inferred]]
+[[Observed]] **Original paper:** it praised the six passages I had broken in the copy.
+
+[[Inferred]] **Era:** it holds drafts to his 2023 to 2025 habits rather than the 2021 paper's.
 
 [[Decision]] hold your drafts to his current habits, or to the era of each paper? I'd use current. **Next:** I'll record each habit's era in the profile.`
 
@@ -609,9 +624,9 @@ These rules shape replies in this terminal. A display plugin draws each \`[[Word
 - **Markers are required where their trigger applies.** Skipping one hides information the user scans for. The triggers:
 ${triggers}
 - **Brief.** One to three plain sentences after the mode marker: what was checked, done or proposed, the outcome, and anything the user must do. No other markers and no bold inside it; the display draws it as a card with the mode in its border. Skip the brief for short answers, conceptual explanations, and manuscript text.
-- **Same place every time.** A verdict right after the bold lead label it answers; an evidence tag at the end of its sentence; a status beside the item or on the lead line of its list; an ask at the start of the last paragraph. At most two markers on a line, except a row of job states; when a reply would need more than about ten, put the items in a table with a column of markers.
+- **Same place every time.** An evidence tag at the start of its bullet or paragraph; a verdict right after the bold lead label it answers; a status beside the item or on the lead line of its list; an ask at the start of the last paragraph. At most two markers on a line, except a row of job states; when a reply would need more than about ten, put the items in a table with a column of markers.
 - **Every attention marker carries its action.** After [[Unverified]], [[Gate missed]], [[Failed]], [[Blocked]], [[Partial]], [[Needs you]], [[Decision]], [[Deviation]], a hazard or a failed job, give the one fact needed to act, introduced by a bold lead-in ending in a colon: ${ACTION_WORDS.map(w => `**${w}:**`).join(', ')}.
-- **Check before sending** a reply that reports work: it opens with the brief; each finding ends with an evidence tag (or its list's lead line has one); each outcome has a status; each ask is the last paragraph.
+- **Check before sending** a reply that reports work: it opens with the brief; each finding starts with an evidence tag (or its list's lead line has one); each outcome has a status; each ask is the last paragraph.
 - **Statistics stay in words and numbers.** Report effects with their CI or adjusted p in plain text; do not make significance into a marker. [[Underpowered]] is the exception.
 - **Bold lead labels, sparingly elsewhere.** Start a bullet that is about one subject with a bold lead label ending in a colon (**Cause:**). Inside sentences, bold at most one or two anchor terms per paragraph. Preferred lead labels: ${LEAD_LABELS.join(', ')}.
 - **Keep text that will be copied clean.** No markers, bold labels or tree shapes in manuscript paragraphs (give those as blockquotes), paths, commands, code, literal output, or anything written to a file.
@@ -628,7 +643,7 @@ ${EXAMPLE}
 /** The one-line reminder attached to each message the user types, so the rules stay in view in long sessions. */
 export const REMINDER =
   'Reply style (emphasis plugin): a reply that reports work opens with a brief starting [[Investigate]], [[Ran]], [[Changed]] or [[Propose]]; ' +
-  'each finding ends with [[Observed]], [[Inferred]], [[Unverified]] or [[Cited]]; each outcome gets a status such as [[Done]], [[Partial 6/8]] or [[Failed]]; ' +
+  'each finding starts with [[Observed]], [[Inferred]], [[Unverified]] or [[Cited]]; each outcome gets a status such as [[Done]], [[Partial 6/8]] or [[Failed]]; ' +
   'an ask is the last paragraph, starting [[Needs you]] or [[Decision]]. Full rules: the Reply style section of CLAUDE.md.'
 
 
