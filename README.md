@@ -2,7 +2,9 @@
 
 A Claude Code plugin that makes replies about research work easy to scan. Claude writes short markers such as `[[Confirmed]]`, `[[Gate missed]]` or `[[OOM 4410273]]`, and the plugin draws each one in a shape and color that says what kind of marker it is. Replies that report work open with a brief card.
 
-![A reply with a brief card, claim verdicts, evidence tags, a table of gates and jobs, ownership handles, a deviation flag and a hazard](docs/screenshot.png)
+![A reply about an overnight fine-tuning run: a brief card, a gate that was met, a table of job states, a corrected claim, a deviation flag and a decision](docs/screenshot.png)
+
+The screenshot uses `icons: nerd-font`. The default, which needs no special font, looks like [this](docs/screenshot-unicode.png).
 
 The plugin changes only what the terminal draws. The stored conversation, copied text and exports keep plain Markdown. It calls no model and costs nothing to run.
 
@@ -37,6 +39,7 @@ Also:
 - Claude Code with function-hook plugins: checked on 2.1.330, Linux.
 - A terminal with 24-bit color. Most terminals have it. Inside tmux, Claude Code drops to 256 colors and the tints look grayer.
 - The default colors are tuned for a dark terminal theme. On a light theme, set `palette` to `bright` (see Options).
+- For rounded pills and icons, a [Nerd Font](https://www.nerdfonts.com/) in your terminal, and `icons` set to `nerd-font`. To check whether your terminal already draws the glyphs, run `printf '\ue0b6\uf00c \uf128 \uf007\ue0b4\n'`: you should see a half circle, a check mark, a question mark, a person and another half circle. Use a "Mono" variant of the font so icons stay one cell wide.
 
 ## Install
 
@@ -70,7 +73,7 @@ Set these in Claude Code's config menu (`/config`, under the plugin's name), or 
 | Option | Values | Default |
 |---|---|---|
 | `palette` | `tinted` (soft chips for a dark theme), `bright` (solid chips in the theme's own colors; use on a light theme) | `tinted` |
-| `icons` | `unicode` (symbols any font draws), `nerd-font` (Nerd Font icons and rounded chip ends), `none` | `unicode` |
+| `icons` | `unicode` (symbols any font draws), `nerd-font` (Nerd Font icons; rounded, arrow and slanted chip ends), `none` | `unicode` |
 | `boldColor` | a theme key such as `suggestion`, or a color name or hex; empty keeps normal text color | `suggestion` |
 
 ## Changing the words

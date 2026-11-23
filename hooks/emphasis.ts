@@ -71,6 +71,53 @@ const THEME_HUES: Record<Hue, { fg: string; wash: string; solid: string }> = {
 
 type Word = { family: Family; hue: Hue; glyph: string; meaning: string }
 
+/** Nerd Font (Font Awesome) icon per word, used when `icons` is `nerd-font`. */
+export const NERD_ICONS: Record<string, string> = {
+  'Investigate': '\uf002',
+  'Propose': '\uf277',
+  'Changed': '\uf040',
+  'Ran': '\uf04b',
+  'Observed': '\uf06e',
+  'Inferred': '\uf0eb',
+  'Unverified': '\uf059',
+  'Cited': '\uf02d',
+  'Confirmed': '\uf058',
+  'Corrected': '\uf044',
+  'Contradicted': '\uf057',
+  'Gate met': '\uf11e',
+  'Gate missed': '\uf11d',
+  'Fold': '\uf28d',
+  'Shelve': '\uf28b',
+  'Exploratory': '\uf14e',
+  'Underpowered': '\uf243',
+  'Done': '\uf00c',
+  'Passed': '\uf00c',
+  'Handed over': '\uf0ec',
+  'Fixed': '\uf0ad',
+  'Recommended': '\uf005',
+  'Failed': '\uf00d',
+  'Blocked': '\uf05e',
+  'Partial': '\uf042',
+  'Skipped': '\uf04e',
+  'At risk': '\uf071',
+  'Needs you': '\uf007',
+  'Decision': '\uf126',
+  'Deviation': '\uf024',
+  'Submitted': '\uf093',
+  'Queued': '\uf017',
+  'Running': '\uf110',
+  'Cancelled': '\uf05e',
+  'Completed': '\uf058',
+  'OOM': '\uf2db',
+  'Killed 143': '\uf253',
+  'Owned': '\uf007',
+  'Shared': '\uf0c0',
+  'Foreign': '\uf023',
+  'Destructive': '\uf1f8',
+  'Irreversible': '\uf023',
+  'GPU quota': '\uf2db',
+}
+
 /** The words the model is told to write, in the order the rules list them. */
 export const WORDS: Record<string, Word> = {
   // Kind of work: opens the brief card at the top of a reply.
@@ -161,6 +208,49 @@ export function modeHue(label: string, set: Settings): string | undefined {
   return w?.family === 'mode' ? (set.palette === 'bright' ? THEME_HUES : HUES)[w.hue].fg : undefined
 }
 
+// Powerline caps from the Nerd Font set: round, arrow and slant ends.
+const ROUND = ['\ue0b6', '\ue0b4']
+const ARROW = ['\ue0b2', '\ue0b0']
+const SLANT = ['\ue0ba', '\ue0bc']
+
+/** A chip: caps in the fill color on either side of the filled label. */
+function chip(text: string, fill: string, fg: string, caps: string[], extra: Partial<Run> = {}): Run[] {
+  return [
+    { s: caps[0]!, color: fill },
+    { s: text, bg: fill, color: fg, bold: true, ...extra },
+    { s: caps[1]!, color: fill },
+  ]
+}
+
+/** The nerd-font drawing: the same families, with real icons and rounded, arrow or slanted ends. */
+function nerdRuns(word: string, w: Word, h: { fg: string; wash: string; solid: string }, shown: string, nb: (s: string) => string): Run[] {
+  const i = NERD_ICONS[word] ?? w.glyph
+  switch (w.family) {
+    case 'evidence':
+      return [{ s: nb(`${i} ${shown}`), color: h.fg, bold: true }]
+    case 'verdict':
+      return chip(nb(`${i} ${shown.toUpperCase()}`), h.solid, '#101010', ROUND)
+    case 'gate':
+      return chip(nb(`${i} ${shown}`), h.wash, h.fg, ARROW)
+    case 'status':
+      return chip(nb(`${i} ${shown}`), h.wash, h.fg, ROUND)
+    case 'ask':
+      return [{ s: nb(`${i} ${shown}`), color: h.solid, bold: true, underline: true }]
+    case 'flag':
+      return [{ s: '▌', color: h.solid }, { s: nb(` ${i} ${shown}`), bg: h.wash, color: h.fg, bold: true }, { s: ROUND[1]!, color: h.wash }]
+    case 'job':
+      return [{ s: '[', dim: true }, { s: nb(`${i} ${shown}`), color: h.fg, bold: true }, { s: ']', dim: true }]
+    case 'owner':
+      return [{ s: nb(`${i} @${shown.toLowerCase()}`), color: h.fg, underline: true }]
+    case 'hazard':
+      return chip(nb(`${i} ${shown.toUpperCase()}`), h.solid, '#ffffff', SLANT)
+    case 'mode':
+      return chip(nb(`${i} ${shown.toUpperCase()}`), h.wash, h.fg, ROUND)
+    case 'context':
+      return [{ s: nb(`‹ ${shown} ›`), dim: true }]
+  }
+}
+
 export function pillRuns(label: string, set: Settings): Run[] {
   const { word, detail, text } = readLabel(label)
   const nb = (s: string) => s.replace(/ /g, ' ')
@@ -169,6 +259,7 @@ export function pillRuns(label: string, set: Settings): Run[] {
   const h = (set.palette === 'bright' ? THEME_HUES : HUES)[w.hue]
   const g = set.icons === 'none' ? '' : w.glyph
   const shown = nb(word + detail)
+  if (set.icons === 'nerd-font') return nerdRuns(word, w, h, shown, nb)
   switch (w.family) {
     case 'evidence':
       return [{ s: nb(`${g ? g + ' ' : ''}${shown}`), color: h.fg, bold: true }]
@@ -181,13 +272,6 @@ export function pillRuns(label: string, set: Settings): Run[] {
         { s: '◗', color: h.wash },
       ]
     case 'status':
-      if (set.icons === 'nerd-font') {
-        return [
-          { s: '', color: h.wash },
-          { s: nb(`${g} ${shown}`), bg: h.wash, color: h.fg, bold: true },
-          { s: '', color: h.wash },
-        ]
-      }
       return [
         { s: '▐', color: h.wash },
         { s: nb(`${g ? g + ' ' : ''}${shown}`), bg: h.wash, color: h.fg, bold: true },
